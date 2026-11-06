@@ -574,7 +574,7 @@ impl AppDelegate {
             return;
         };
         let items = Self::live_items();
-        self.ivars().capture.borrow_mut().collect(&items);
+        self.capture_items(&items);
         let hidden = items
             .into_iter()
             .filter(|item| layout::section_at(item.frame.x, dividers) != Section::Visible)
@@ -730,9 +730,13 @@ impl AppDelegate {
         self.refresh_layout_view();
     }
 
+    /// A move was refused or failed. During a restore only that entry is skipped; the rest of
+    /// the queue still runs.
     fn move_failed(&self) {
-        self.ivars().restoring.set(false);
-        self.ivars().restore_queue.borrow_mut().clear();
+        let more = !self.ivars().restore_queue.borrow().is_empty();
+        self.ivars()
+            .restoring
+            .set(self.ivars().restoring.get() && more);
         self.ivars().layout_note.set(Some(Text::LayoutMoveFailed));
         self.refresh_layout_view();
     }
@@ -915,16 +919,30 @@ impl AppDelegate {
                 self.refresh_settings();
                 return;
             }
-            let mut cache = self.ivars().capture.borrow_mut();
-            cache.collect(&items);
-            if let Some((bounds, _, _)) = self
+            // Capture only while the panel is open: Screen Recording must not run in the
+            // background just because the feature is switched on.
+            if self
                 .ivars()
-                .status_bar
+                .secondary
                 .get()
-                .and_then(|status| status.geometry(self.mtm()))
+                .is_some_and(SecondaryBar::is_shown)
             {
-                cache.request(&items, bounds);
+                self.capture_items(&items);
             }
+        }
+    }
+
+    /// Collects finished captures and asks for new ones, for the secondary bar only.
+    fn capture_items(&self, items: &[MenuBarItem]) {
+        let mut cache = self.ivars().capture.borrow_mut();
+        cache.collect(items);
+        if let Some((bounds, _, _)) = self
+            .ivars()
+            .status_bar
+            .get()
+            .and_then(|status| status.geometry(self.mtm()))
+        {
+            cache.request(items, bounds);
         }
     }
 

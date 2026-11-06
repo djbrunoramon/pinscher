@@ -14,7 +14,7 @@ use objc2_core_graphics::{
     CGEvent, CGEventFlags, CGEventSource, CGEventSourceStateID, CGEventTapLocation, CGEventType,
     CGMouseButton,
 };
-use objc2_foundation::NSTimer;
+use objc2_foundation::{NSRunLoop, NSRunLoopCommonModes, NSTimer};
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -116,10 +116,17 @@ impl Drag {
                 did_move.set(true);
             }
         });
-        // SAFETY: this non-escaping stack block is copied by NSTimer. It has the documented
-        // timer-pointer signature and only captures owned events and main-thread state.
-        let timer =
-            unsafe { NSTimer::scheduledTimerWithTimeInterval_repeats_block(0.08, true, &block) };
+        // SAFETY: NSTimer copies the block. The timer is added to the main run loop below and
+        // `Drag` is only created on the main thread, so the block, which captures non-`Send`
+        // values, only ever runs there. It has the documented timer-pointer signature.
+        let timer = unsafe { NSTimer::timerWithTimeInterval_repeats_block(0.08, true, &block) };
+        // Common modes keep the release ticking while a menu or other tracking loop is active,
+        // so the synthetic button cannot stay held down.
+        // SAFETY: `NSRunLoopCommonModes` is a valid mode constant and the timer is not yet
+        // scheduled anywhere else.
+        unsafe {
+            NSRunLoop::mainRunLoop().addTimer_forMode(&timer, NSRunLoopCommonModes);
+        }
         self.timer = Some(timer);
         self.release = Some(Release {
             origin: up_from,

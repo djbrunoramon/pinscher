@@ -13,6 +13,7 @@ use objc2_app_kit::{
 };
 use objc2_foundation::NSString;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 /// Wide enough to push every item to its left off any screen.
 const COLLAPSED_LENGTH: f64 = 10_000.0;
@@ -22,7 +23,7 @@ const COLLAPSED_LENGTH: f64 = 10_000.0;
 pub struct StatusBar {
     icon: Retained<NSStatusItem>,
     separator: Retained<NSStatusItem>,
-    always_hidden: RefCell<Option<Retained<NSStatusItem>>>,
+    always_hidden: Rc<RefCell<Option<Retained<NSStatusItem>>>>,
 }
 
 impl StatusBar {
@@ -60,7 +61,7 @@ impl StatusBar {
         Self {
             icon,
             separator,
-            always_hidden: RefCell::new(None),
+            always_hidden: Rc::new(RefCell::new(None)),
         }
     }
 
