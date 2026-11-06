@@ -24,7 +24,11 @@ lipo -create \
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" packaging/Info.plist > "$APP/Contents/Info.plist"
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
 
-codesign --force --options runtime --timestamp=none --sign "$IDENTITY" "$APP"
+if [[ "$IDENTITY" == "-" ]]; then
+  codesign --force --options runtime --timestamp=none --sign "$IDENTITY" "$APP"
+else
+  codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP"
+fi
 codesign --verify --strict "$APP"
 
 echo "Built $APP ($VERSION build $BUILD, signed with: $IDENTITY)"
