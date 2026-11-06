@@ -72,17 +72,29 @@ impl Hotkey {
     pub fn register(&mut self, shortcut: &Shortcut) -> Result<(), HotkeyError> {
         let hotkey =
             HotKey::from_str(&shortcut.to_config_string()).map_err(|_| HotkeyError::Parse)?;
-        if let Some(previous) = self.registered.take() {
-            self.manager
-                .unregister(previous)
-                .map_err(|_| HotkeyError::Unregister)?;
-        }
-        REGISTERED_ID.store(0, Ordering::Release);
+        self.unregister()?;
         self.manager
             .register(hotkey)
             .map_err(|_| HotkeyError::Register)?;
         REGISTERED_ID.store(hotkey.id(), Ordering::Release);
         self.registered = Some(hotkey);
+        Ok(())
+    }
+}
+
+impl Hotkey {
+    /// Removes the registered shortcut, if any.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HotkeyError::Unregister`] when the operating system refuses.
+    pub fn unregister(&mut self) -> Result<(), HotkeyError> {
+        REGISTERED_ID.store(0, Ordering::Release);
+        if let Some(previous) = self.registered.take() {
+            self.manager
+                .unregister(previous)
+                .map_err(|_| HotkeyError::Unregister)?;
+        }
         Ok(())
     }
 }

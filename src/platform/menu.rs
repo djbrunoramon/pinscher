@@ -19,6 +19,7 @@ pub struct MenuState {
 /// Selectors the menu sends to its target.
 #[derive(Debug, Clone, Copy)]
 pub struct MenuActions {
+    pub settings: Sel,
     pub about: Sel,
     pub toggle_login: Sel,
 }
@@ -43,6 +44,14 @@ pub fn show(
         menu.addItem(&NSMenuItem::separatorItem(mtm));
     }
 
+    let settings = add(
+        &menu,
+        mtm,
+        text(lang, Text::MenuPreferences),
+        Some(actions.settings),
+        Some(target),
+    );
+    settings.setKeyEquivalent(&NSString::from_str(","));
     add(
         &menu,
         mtm,
