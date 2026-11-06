@@ -44,6 +44,15 @@ pub enum Action {
     None,
 }
 
+/// How the always-hidden divider should be drawn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Divider {
+    /// A thin, visible divider: items left of it are shown.
+    Thin,
+    /// Grown so items left of it stay off screen even when the bar is expanded.
+    Collapsed,
+}
+
 /// A one-shot collapse request for the platform timer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CollapseTimer {
@@ -58,6 +67,7 @@ pub struct Bar {
     auto_hide: Option<Duration>,
     generation: u64,
     user_expanded: bool,
+    revealing_all: bool,
 }
 
 impl Default for Bar {
@@ -67,6 +77,7 @@ impl Default for Bar {
             auto_hide: None,
             generation: 0,
             user_expanded: false,
+            revealing_all: false,
         }
     }
 }
@@ -109,6 +120,42 @@ impl Bar {
         self.collapse(layout)
     }
 
+    /// Expands and also shows the always-hidden section until the next collapse, so the user can
+    /// see and ⌘-drag those items.
+    pub fn reveal_all(&mut self) -> Action {
+        self.revealing_all = true;
+        self.visibility = Visibility::Expanded;
+        self.user_expanded = true;
+        self.generation = self.generation.wrapping_add(1);
+        Action::Apply(Visibility::Expanded)
+    }
+
+    /// Whether the always-hidden section is currently revealed.
+    #[must_use]
+    pub fn revealing_all(&self) -> bool {
+        self.revealing_all
+    }
+
+    /// How to draw the always-hidden divider at `always_hidden_x`.
+    ///
+    /// It only grows when it sits left of the separator, which sits left of the icon; otherwise
+    /// growing it could push the separator or the Pinscher icon itself off screen (AM-06).
+    #[must_use]
+    pub fn always_hidden_divider(&self, layout: Option<Layout>, always_hidden_x: f64) -> Divider {
+        let ordered = layout.is_some_and(|layout| {
+            [always_hidden_x, layout.separator_x, layout.icon_x]
+                .iter()
+                .all(|x| x.is_finite())
+                && always_hidden_x < layout.separator_x
+                && layout.separator_x < layout.icon_x
+        });
+        if ordered && !self.revealing_all {
+            Divider::Collapsed
+        } else {
+            Divider::Thin
+        }
+    }
+
     /// Flips between expanded and collapsed. `layout` is only needed to collapse.
     pub fn toggle(&mut self, layout: Option<Layout>) -> Action {
         match self.visibility {
@@ -129,6 +176,9 @@ impl Bar {
         }
         match layout {
             None => Action::Blocked(Blocked::LayoutUnknown),
+            Some(layout) if !layout.icon_x.is_finite() || !layout.separator_x.is_finite() => {
+                Action::Blocked(Blocked::LayoutUnknown)
+            }
             Some(layout) if layout.separator_x >= layout.icon_x => {
                 Action::Blocked(Blocked::SeparatorRightOfIcon)
             }
@@ -143,6 +193,9 @@ impl Bar {
         self.visibility = visibility;
         self.generation = self.generation.wrapping_add(1);
         self.user_expanded = visibility == Visibility::Expanded;
+        if visibility == Visibility::Collapsed {
+            self.revealing_all = false;
+        }
         Action::Apply(visibility)
     }
 }
@@ -300,5 +353,84 @@ mod tests {
         bar.set_auto_hide(Some(Duration::from_secs(5)));
 
         assert_eq!(bar.pending_collapse(), None);
+    }
+
+    #[test]
+    fn always_hidden_divider_collapses_when_ordered() {
+        let bar = Bar::new();
+        assert_eq!(
+            bar.always_hidden_divider(Some(ORDERED), 900.0),
+            Divider::Collapsed
+        );
+    }
+
+    #[test]
+    fn always_hidden_divider_stays_thin_when_out_of_order() {
+        let bar = Bar::new();
+        // Right of the separator: growing it would hide the separator and the icon.
+        assert_eq!(
+            bar.always_hidden_divider(Some(ORDERED), 1150.0),
+            Divider::Thin
+        );
+        assert_eq!(bar.always_hidden_divider(None, 900.0), Divider::Thin);
+    }
+
+    #[test]
+    fn reveal_all_shows_always_hidden_until_next_collapse() {
+        let mut bar = Bar::new();
+        assert_eq!(bar.reveal_all(), Action::Apply(Visibility::Expanded));
+        assert!(bar.revealing_all());
+        assert_eq!(
+            bar.always_hidden_divider(Some(ORDERED), 900.0),
+            Divider::Thin
+        );
+        bar.collapse(Some(ORDERED));
+        assert!(!bar.revealing_all());
+        bar.expand();
+        assert_eq!(
+            bar.always_hidden_divider(Some(ORDERED), 900.0),
+            Divider::Collapsed
+        );
+    }
+
+    #[test]
+    fn reveal_all_from_collapsed_expands_and_schedules_auto_hide() {
+        let mut bar = Bar::new();
+        bar.set_auto_hide(Some(Duration::from_secs(5)));
+        bar.collapse(Some(ORDERED));
+        assert_eq!(bar.reveal_all(), Action::Apply(Visibility::Expanded));
+        assert!(bar.pending_collapse().is_some());
+    }
+    #[test]
+    fn reveal_all_restarts_auto_hide_when_already_expanded() {
+        let mut bar = Bar::new();
+        bar.set_auto_hide(Some(Duration::from_secs(5)));
+        bar.reveal_all();
+        let first = bar
+            .pending_collapse()
+            .expect("user reveal schedules a timer");
+        bar.reveal_all();
+        let second = bar.pending_collapse().unwrap();
+        assert_ne!(first.generation, second.generation);
+        assert_eq!(bar.on_timer(first.generation, Some(ORDERED)), Action::None);
+    }
+
+    #[test]
+    fn invalid_positions_never_collapse_dividers() {
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let layout = Layout {
+                icon_x: invalid,
+                separator_x: 1100.0,
+            };
+            let mut bar = Bar::new();
+            assert_eq!(
+                bar.collapse(Some(layout)),
+                Action::Blocked(Blocked::LayoutUnknown)
+            );
+            assert_eq!(
+                bar.always_hidden_divider(Some(layout), 900.0),
+                Divider::Thin
+            );
+        }
     }
 }

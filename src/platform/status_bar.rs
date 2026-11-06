@@ -2,7 +2,7 @@
 //!
 //! Holds no decisions: `core::bar` decides, this module only reads positions and applies state.
 
-use crate::core::bar::{Layout, Visibility};
+use crate::core::bar::{Divider, Layout, Visibility};
 use crate::core::l10n::{Lang, Text, text};
 use objc2::MainThreadMarker;
 use objc2::rc::Retained;
@@ -12,6 +12,7 @@ use objc2_app_kit::{
     NSVariableStatusItemLength,
 };
 use objc2_foundation::NSString;
+use std::cell::RefCell;
 
 /// Wide enough to push every item to its left off any screen.
 const COLLAPSED_LENGTH: f64 = 10_000.0;
@@ -21,6 +22,7 @@ const COLLAPSED_LENGTH: f64 = 10_000.0;
 pub struct StatusBar {
     icon: Retained<NSStatusItem>,
     separator: Retained<NSStatusItem>,
+    always_hidden: RefCell<Option<Retained<NSStatusItem>>>,
 }
 
 impl StatusBar {
@@ -55,7 +57,11 @@ impl StatusBar {
             );
         }
 
-        Self { icon, separator }
+        Self {
+            icon,
+            separator,
+            always_hidden: RefCell::new(None),
+        }
     }
 
     /// Current left edge of each item on screen, or `None` while either is not on screen.
@@ -77,6 +83,55 @@ impl StatusBar {
         });
         if let Some(button) = self.separator.button(mtm) {
             // A collapsed separator is a blank spacer; hide its glyph.
+            button.setImagePosition(if collapsed {
+                NSCellImagePosition::NoImage
+            } else {
+                NSCellImagePosition::ImageOnly
+            });
+        }
+    }
+
+    /// Adds or removes the optional divider, preserving its autosaved position.
+    pub fn set_always_hidden(&self, mtm: MainThreadMarker, lang: Lang, enabled: bool) {
+        let mut slot = self.always_hidden.borrow_mut();
+        if enabled && slot.is_none() {
+            let item =
+                NSStatusBar::systemStatusBar().statusItemWithLength(NSVariableStatusItemLength);
+            item.setAutosaveName(Some(&NSString::from_str("pinscher.always-hidden")));
+            if let Some(button) = item.button(mtm) {
+                set_symbol(
+                    &button,
+                    "line.diagonal",
+                    text(lang, Text::AlwaysHiddenAccessibility),
+                );
+            }
+            *slot = Some(item);
+        } else if !enabled && let Some(item) = slot.take() {
+            NSStatusBar::systemStatusBar().removeStatusItem(&item);
+        }
+    }
+
+    #[must_use]
+    pub fn always_hidden_x(&self, mtm: MainThreadMarker) -> Option<f64> {
+        left_edge(self.always_hidden.borrow().as_ref()?, mtm)
+    }
+
+    /// Applies the core's order-checked divider state.
+    pub fn apply_always_hidden(&self, mtm: MainThreadMarker, state: Divider) {
+        let slot = self.always_hidden.borrow();
+        let Some(item) = slot.as_ref() else {
+            return;
+        };
+        let collapsed = state == Divider::Collapsed;
+        let length = if collapsed {
+            COLLAPSED_LENGTH
+        } else {
+            NSVariableStatusItemLength
+        };
+        if (item.length() - length).abs() > f64::EPSILON {
+            item.setLength(length);
+        }
+        if let Some(button) = item.button(mtm) {
             button.setImagePosition(if collapsed {
                 NSCellImagePosition::NoImage
             } else {

@@ -3,7 +3,7 @@
 use block2::StackBlock;
 use objc2::msg_send;
 use objc2::rc::Retained;
-use objc2::runtime::AnyObject;
+use objc2::runtime::{AnyObject, Sel};
 use objc2_foundation::{NSNumber, NSTimer};
 use std::time::Duration;
 
@@ -40,10 +40,28 @@ impl Timer {
         self.timer = Some(timer);
     }
 
+    /// Observes status item reordering on the main run loop while a divider is enabled.
+    pub fn observe_layout(&mut self, target: &AnyObject, action: Sel) {
+        self.cancel();
+        // SAFETY: target is the app delegate, retained for the application's lifetime, and
+        // action accepts one timer argument. This timer runs on the main thread.
+        self.timer = Some(unsafe {
+            NSTimer::scheduledTimerWithTimeInterval_target_selector_userInfo_repeats(
+                0.5, target, action, None, true,
+            )
+        });
+    }
+
     /// Invalidates and releases the current timer, if any.
     pub fn cancel(&mut self) {
         if let Some(timer) = self.timer.take() {
             timer.invalidate();
         }
+    }
+}
+
+impl Drop for Timer {
+    fn drop(&mut self) {
+        self.cancel();
     }
 }

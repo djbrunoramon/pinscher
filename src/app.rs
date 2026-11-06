@@ -38,6 +38,7 @@ pub struct Ivars {
     key_monitor: RefCell<Option<Retained<AnyObject>>>,
     bar: RefCell<Bar>,
     timer: RefCell<Timer>,
+    divider_timer: RefCell<Timer>,
     warnings: RefCell<Vec<Text>>,
 }
 
@@ -86,6 +87,7 @@ define_class!(
                 tracing::debug!(count = items.len(), "menu bar items");
             }
             let _ = self.ivars().status_bar.set(status_bar);
+            self.configure_always_hidden();
 
             match Hotkey::new(mtm) {
                 Ok(hotkey) => *self.ivars().hotkey.borrow_mut() = Some(hotkey),
@@ -114,6 +116,7 @@ define_class!(
             match action {
                 Action::Apply(visibility) => {
                     status_bar.apply(mtm, visibility);
+                    self.refresh_dividers();
                     if visibility == crate::core::bar::Visibility::Collapsed {
                         self.ivars().timer.borrow_mut().cancel();
                     }
@@ -135,6 +138,25 @@ define_class!(
                 self.show_menu();
             } else {
                 self.toggle();
+            }
+        }
+
+        #[unsafe(method(refreshDividers:))]
+        fn refresh_dividers_fired(&self, _sender: Option<&AnyObject>) {
+            self.refresh_dividers();
+        }
+
+        #[unsafe(method(revealAll:))]
+        fn reveal_all(&self, _sender: Option<&AnyObject>) {
+            let action = self.ivars().bar.borrow_mut().reveal_all();
+            if let Action::Apply(visibility) = action {
+                if let Some(status_bar) = self.ivars().status_bar.get() {
+                    status_bar.apply(self.mtm(), visibility);
+                }
+                self.refresh_dividers();
+                if let Some(request) = self.ivars().bar.borrow().pending_collapse() {
+                    self.ivars().timer.borrow_mut().schedule_once(request.after, request.generation, self.as_target());
+                }
             }
         }
 
@@ -199,6 +221,7 @@ define_class!(
         #[unsafe(method(settingsAlwaysHidden:))]
         fn settings_always_hidden(&self, sender: &NSButton) {
             self.ivars().config.borrow_mut().advanced.always_hidden = preferences::is_on(sender);
+            self.configure_always_hidden();
             self.save_config();
             self.refresh_settings();
         }
@@ -327,6 +350,7 @@ impl AppDelegate {
             Action::Apply(visibility) => {
                 self.ivars().warnings.borrow_mut().clear();
                 status_bar.apply(mtm, visibility);
+                self.refresh_dividers();
                 if visibility == crate::core::bar::Visibility::Expanded {
                     if let Some(request) = self.ivars().bar.borrow().pending_collapse() {
                         self.ivars().timer.borrow_mut().schedule_once(
@@ -348,6 +372,38 @@ impl AppDelegate {
             }
             Action::None => {}
         }
+    }
+
+    fn configure_always_hidden(&self) {
+        let enabled = self.ivars().config.borrow().advanced.always_hidden;
+        if let Some(status_bar) = self.ivars().status_bar.get() {
+            status_bar.set_always_hidden(self.mtm(), self.lang(), enabled);
+        }
+        if enabled {
+            self.ivars()
+                .divider_timer
+                .borrow_mut()
+                .observe_layout(self.as_target(), sel!(refreshDividers:));
+        } else {
+            self.ivars().divider_timer.borrow_mut().cancel();
+        }
+        self.refresh_dividers();
+    }
+
+    fn refresh_dividers(&self) {
+        let Some(status_bar) = self.ivars().status_bar.get() else {
+            return;
+        };
+        let state =
+            status_bar
+                .always_hidden_x(self.mtm())
+                .map_or(crate::core::bar::Divider::Thin, |x| {
+                    self.ivars()
+                        .bar
+                        .borrow()
+                        .always_hidden_divider(status_bar.layout(self.mtm()), x)
+                });
+        status_bar.apply_always_hidden(self.mtm(), state);
     }
 
     fn open_settings(&self) {
@@ -510,6 +566,7 @@ impl AppDelegate {
             settings: sel!(showSettings:),
             about: sel!(showAbout:),
             toggle_login: sel!(toggleLaunchAtLogin:),
+            reveal_all: sel!(revealAll:),
         };
         menu::show(mtm, self.lang(), &state, self.as_target(), actions, &button);
     }

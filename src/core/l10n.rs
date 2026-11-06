@@ -35,6 +35,8 @@ pub enum Text {
     IconAccessibility,
     IconTooltip,
     SeparatorAccessibility,
+    AlwaysHiddenAccessibility,
+    MenuRevealAll,
     MenuPreferences,
     MenuAbout,
     MenuQuit,
@@ -73,6 +75,8 @@ fn en(text: Text) -> &'static str {
         Text::IconAccessibility => "Pinscher",
         Text::IconTooltip => "Click to show or hide icons. Right-click for options.",
         Text::SeparatorAccessibility => "Pinscher separator",
+        Text::AlwaysHiddenAccessibility => "Pinscher always-hidden separator",
+        Text::MenuRevealAll => "Reveal All Icons to Arrange…",
         Text::MenuPreferences => "Settings…",
         Text::MenuAbout => "About Pinscher",
         Text::MenuQuit => "Quit Pinscher",
@@ -115,6 +119,8 @@ fn pt_br(text: Text) -> &'static str {
             "Clique para mostrar ou ocultar ícones. Clique com o botão direito para opções."
         }
         Text::SeparatorAccessibility => "Separador do Pinscher",
+        Text::AlwaysHiddenAccessibility => "Separador sempre oculto do Pinscher",
+        Text::MenuRevealAll => "Revelar todos os ícones para organizar…",
         Text::MenuPreferences => "Ajustes…",
         Text::MenuAbout => "Sobre o Pinscher",
         Text::MenuQuit => "Encerrar o Pinscher",

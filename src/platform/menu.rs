@@ -22,6 +22,7 @@ pub struct MenuActions {
     pub settings: Sel,
     pub about: Sel,
     pub toggle_login: Sel,
+    pub reveal_all: Sel,
 }
 
 /// Builds the menu and pops it up under `button`.
@@ -44,6 +45,13 @@ pub fn show(
         menu.addItem(&NSMenuItem::separatorItem(mtm));
     }
 
+    add(
+        &menu,
+        mtm,
+        text(lang, Text::MenuRevealAll),
+        Some(actions.reveal_all),
+        Some(target),
+    );
     let settings = add(
         &menu,
         mtm,
