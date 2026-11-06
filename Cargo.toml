@@ -1,0 +1,47 @@
+[package]
+name = "pinscher"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+description = "A small, fast macOS menu bar manager that hides the icons you don't need."
+license = "MIT"
+repository = "https://github.com/djbrunoramon/pinscher"
+readme = "README.md"
+keywords = ["macos", "menu-bar", "status-bar", "appkit"]
+categories = ["gui"]
+publish = false
+
+[dependencies]
+block2 = "0.6.2"
+global-hotkey = "0.9.0"
+objc2 = "0.6.5"
+objc2-app-kit = "0.3.2"
+objc2-core-foundation = "0.3.2"
+objc2-core-graphics = "0.3.2"
+objc2-foundation = "0.3.2"
+objc2-service-management = "0.3.2"
+serde = { version = "1.0.229", features = ["derive"] }
+thiserror = "2.0.21"
+toml = "1.2.1"
+tracing = "0.1.44"
+tracing-oslog = "0.3.0"
+tracing-subscriber = "0.3.23"
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_debug_implementations = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+missing_panics_doc = "allow"
+undocumented_unsafe_blocks = "warn"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
