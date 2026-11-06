@@ -1,7 +1,7 @@
 //! Menu bar items and which section each one is in.
 //!
-//! The window server reports every status item as a small window on the status layer. This
-//! module filters those windows, orders them left to right and assigns each to a section by
+//! Accessibility reports status items with their owner, title and frame. This module filters
+//! those items, orders them left to right and assigns each to a section by
 //! comparing its position with Pinscher's dividers:
 //!
 //! ```text
@@ -10,10 +10,7 @@
 
 use crate::core::config::{SavedItem, Section};
 
-/// Window layer of menu bar status items (`kCGStatusWindowLevel`).
-pub const STATUS_ITEM_LAYER: i32 = 25;
-
-/// A rectangle in global screen points (origin top-left, as the window server reports it).
+/// A rectangle in global screen points (origin top-left, as Accessibility reports it).
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct Rect {
     pub x: f64,
@@ -34,15 +31,13 @@ impl Rect {
     }
 }
 
-/// A window as reported by the window server, already converted from macOS types.
+/// A status item reported by Accessibility, already converted from macOS types.
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct RawWindow {
-    pub id: u32,
-    pub layer: i32,
+pub struct RawItem {
     pub owner_pid: i32,
     /// Owner's bundle identifier, or its process name when it has none.
     pub owner: String,
-    /// Window title; empty without Screen Recording permission.
+    /// Accessible title, description or identifier; empty when none is available.
     pub title: String,
     pub frame: Rect,
 }
@@ -50,7 +45,6 @@ pub struct RawWindow {
 /// A status item that belongs to another app.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct MenuBarItem {
-    pub id: u32,
     pub owner_pid: i32,
     pub owner: String,
     pub title: String,
@@ -74,24 +68,17 @@ pub struct Sections {
 
 /// Keeps other apps' status items, ordered left to right.
 #[must_use]
-pub fn menu_bar_items(
-    windows: impl IntoIterator<Item = RawWindow>,
-    own_pid: i32,
-) -> Vec<MenuBarItem> {
-    let mut items: Vec<MenuBarItem> = windows
+pub fn menu_bar_items(raw: impl IntoIterator<Item = RawItem>, own_pid: i32) -> Vec<MenuBarItem> {
+    let mut items: Vec<MenuBarItem> = raw
         .into_iter()
-        .filter(|window| {
-            window.layer == STATUS_ITEM_LAYER
-                && window.owner_pid != own_pid
-                && window.frame.width > 0.0
-                && window.frame.height > 0.0
+        .filter(|item| {
+            item.owner_pid != own_pid && item.frame.width > 0.0 && item.frame.height > 0.0
         })
-        .map(|window| MenuBarItem {
-            id: window.id,
-            owner_pid: window.owner_pid,
-            owner: window.owner,
-            title: window.title,
-            frame: window.frame,
+        .map(|item| MenuBarItem {
+            owner_pid: item.owner_pid,
+            owner: item.owner,
+            title: item.title,
+            frame: item.frame,
         })
         .collect();
     items.sort_by(|a, b| a.frame.x.total_cmp(&b.frame.x));
@@ -142,11 +129,9 @@ mod tests {
 
     const OWN_PID: i32 = 42;
 
-    fn window(id: u32, owner: &str, x: f64) -> RawWindow {
-        RawWindow {
-            id,
-            layer: STATUS_ITEM_LAYER,
-            owner_pid: i32::try_from(id).unwrap() + 100,
+    fn item(id: i32, owner: &str, x: f64) -> RawItem {
+        RawItem {
+            owner_pid: id + 100,
             owner: owner.into(),
             title: format!("item {id}"),
             frame: Rect {
@@ -159,23 +144,25 @@ mod tests {
     }
 
     #[test]
-    fn keeps_only_other_apps_status_items_in_order() {
-        let mut own = window(1, "pinscher", 500.0);
+    fn keeps_only_other_apps_items_in_order() {
+        let mut own = item(1, "pinscher", 500.0);
         own.owner_pid = OWN_PID;
-        let mut normal_window = window(2, "app.window", 100.0);
-        normal_window.layer = 0;
-        let mut empty = window(3, "app.empty", 200.0);
+        let ordinary = item(2, "app.ordinary", 100.0);
+        let mut empty = item(3, "app.empty", 200.0);
         empty.frame.width = 0.0;
-        let windows = vec![
-            window(5, "app.b", 900.0),
+        let mut flat = item(6, "app.flat", 250.0);
+        flat.frame.height = 0.0;
+        let raw = vec![
+            item(5, "app.b", 900.0),
             own,
-            normal_window,
+            ordinary,
             empty,
-            window(4, "app.a", 300.0),
+            flat,
+            item(4, "app.a", 300.0),
         ];
-        let items = menu_bar_items(windows, OWN_PID);
-        let ids: Vec<u32> = items.iter().map(|item| item.id).collect();
-        assert_eq!(ids, [4, 5]);
+        let items = menu_bar_items(raw, OWN_PID);
+        let owners: Vec<&str> = items.iter().map(|item| item.owner.as_str()).collect();
+        assert_eq!(owners, ["app.ordinary", "app.a", "app.b"]);
     }
 
     #[test]
@@ -202,9 +189,9 @@ mod tests {
     fn groups_items() {
         let items = menu_bar_items(
             vec![
-                window(1, "a", 100.0),
-                window(2, "b", 400.0),
-                window(3, "c", 700.0),
+                item(1, "a", 100.0),
+                item(2, "b", 400.0),
+                item(3, "c", 700.0),
             ],
             OWN_PID,
         );
@@ -222,7 +209,7 @@ mod tests {
 
     #[test]
     fn matches_saved_items() {
-        let item = &menu_bar_items(vec![window(7, "com.example.app", 10.0)], OWN_PID)[0];
+        let item = &menu_bar_items(vec![item(7, "com.example.app", 10.0)], OWN_PID)[0];
         let saved = [SavedItem {
             owner: "com.example.app".into(),
             title: "item 7".into(),
@@ -233,7 +220,7 @@ mod tests {
 
     #[test]
     fn ignores_missing() {
-        let item = &menu_bar_items(vec![window(7, "com.example.app", 10.0)], OWN_PID)[0];
+        let item = &menu_bar_items(vec![item(7, "com.example.app", 10.0)], OWN_PID)[0];
         let saved = [SavedItem {
             owner: "com.example.app".into(),
             title: "another title".into(),

@@ -8,16 +8,13 @@ use crate::core::config::Advanced;
 /// A system permission Pinscher can use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Permission {
-    /// Read other apps' status item titles and capture their images.
-    ScreenRecording,
-    /// Post synthetic mouse events (clicking and moving status items).
+    /// Discover, press and move other apps' status items.
     Accessibility,
 }
 
 /// What the system has granted.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Granted {
-    pub screen_recording: bool,
     pub accessibility: bool,
 }
 
@@ -25,7 +22,7 @@ pub struct Granted {
 #[must_use]
 pub fn required(advanced: &Advanced) -> Vec<Permission> {
     if advanced.secondary_bar {
-        vec![Permission::ScreenRecording, Permission::Accessibility]
+        vec![Permission::Accessibility]
     } else {
         Vec::new()
     }
@@ -34,7 +31,7 @@ pub fn required(advanced: &Advanced) -> Vec<Permission> {
 /// Permissions needed to rearrange items from Preferences.
 #[must_use]
 pub fn required_for_reordering() -> Vec<Permission> {
-    vec![Permission::ScreenRecording, Permission::Accessibility]
+    vec![Permission::Accessibility]
 }
 
 /// The subset of `needed` that is not granted.
@@ -44,7 +41,6 @@ pub fn missing(needed: &[Permission], granted: Granted) -> Vec<Permission> {
         .iter()
         .copied()
         .filter(|permission| match permission {
-            Permission::ScreenRecording => !granted.screen_recording,
             Permission::Accessibility => !granted.accessibility,
         })
         .collect()
@@ -69,22 +65,19 @@ mod tests {
     }
 
     #[test]
-    fn secondary_bar_needs_capture_and_events() {
+    fn secondary_bar_needs_accessibility() {
         let advanced = Advanced {
             secondary_bar: true,
             ..Advanced::default()
         };
-        assert_eq!(
-            required(&advanced),
-            [Permission::ScreenRecording, Permission::Accessibility]
-        );
+        assert_eq!(required(&advanced), [Permission::Accessibility]);
     }
 
     #[test]
     fn reports_only_missing_permissions() {
         let needed = required_for_reordering();
+        assert_eq!(needed, [Permission::Accessibility]);
         let granted = Granted {
-            screen_recording: true,
             accessibility: false,
         };
         assert_eq!(missing(&needed, granted), [Permission::Accessibility]);
@@ -92,7 +85,6 @@ mod tests {
             missing(
                 &needed,
                 Granted {
-                    screen_recording: true,
                     accessibility: true
                 }
             ),
