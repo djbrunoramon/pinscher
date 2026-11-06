@@ -8,4 +8,5 @@ pub mod menu;
 pub mod paths;
 pub mod permissions;
 pub mod status_bar;
+pub mod timer;
 pub mod window_list;

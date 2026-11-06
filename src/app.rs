@@ -7,7 +7,7 @@ use crate::core::login::LoginRequest;
 use crate::platform::hotkey::Hotkey;
 use crate::platform::menu::{self, MenuActions, MenuState};
 use crate::platform::status_bar::StatusBar;
-use crate::platform::{language, login_item, paths};
+use crate::platform::{language, login_item, paths, timer::Timer};
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, ProtocolObject};
 use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, sel};
@@ -15,9 +15,10 @@ use objc2_app_kit::{
     NSApplication, NSApplicationActivationPolicy, NSApplicationDelegate, NSEventModifierFlags,
     NSEventType,
 };
-use objc2_foundation::{NSNotification, NSObject, NSObjectProtocol};
+use objc2_foundation::{NSNotification, NSNumber, NSObject, NSObjectProtocol};
 use std::cell::{OnceCell, RefCell};
 use std::path::PathBuf;
+use std::time::Duration;
 
 #[derive(Debug, Default)]
 pub struct Ivars {
@@ -27,6 +28,7 @@ pub struct Ivars {
     status_bar: OnceCell<StatusBar>,
     hotkey: OnceCell<Hotkey>,
     bar: RefCell<Bar>,
+    timer: RefCell<Timer>,
     warnings: RefCell<Vec<Text>>,
 }
 
@@ -55,6 +57,12 @@ define_class!(
                 tracing::warn!(?warning, "config");
             }
             *self.ivars().config.borrow_mut() = loaded.config;
+            let auto_hide = self.ivars().config.borrow().auto_hide.clone();
+            self.ivars().bar.borrow_mut().set_auto_hide(if auto_hide.enabled {
+                Some(Duration::from_secs(u64::from(auto_hide.delay_secs)))
+            } else {
+                None
+            });
             let _ = self.ivars().config_path.set(config_path);
 
             let status_bar = StatusBar::new(mtm, lang, self.as_target(), sel!(iconClicked:));
@@ -96,6 +104,27 @@ define_class!(
         #[unsafe(method(hotkeyPressed:))]
         fn hotkey_pressed(&self, _sender: Option<&AnyObject>) {
             self.toggle();
+        }
+
+        #[unsafe(method(autoHideFired:))]
+        fn auto_hide_fired(&self, generation: &NSNumber) {
+            let mtm = self.mtm();
+            let Some(status_bar) = self.ivars().status_bar.get() else {
+                return;
+            };
+            let layout = status_bar.layout(mtm);
+            let action = self.ivars().bar.borrow_mut().on_timer(generation.as_u64(), layout);
+            tracing::debug!(?layout, ?action, "auto-hide timer fired");
+            match action {
+                Action::Apply(visibility) => {
+                    status_bar.apply(mtm, visibility);
+                    if visibility == crate::core::bar::Visibility::Collapsed {
+                        self.ivars().timer.borrow_mut().cancel();
+                    }
+                }
+                Action::Blocked(blocked) => tracing::debug!(?blocked, "auto-hide collapse blocked"),
+                Action::None => {}
+            }
         }
 
         #[unsafe(method(iconClicked:))]
@@ -168,6 +197,17 @@ impl AppDelegate {
             Action::Apply(visibility) => {
                 self.ivars().warnings.borrow_mut().clear();
                 status_bar.apply(mtm, visibility);
+                if visibility == crate::core::bar::Visibility::Expanded {
+                    if let Some(request) = self.ivars().bar.borrow().pending_collapse() {
+                        self.ivars().timer.borrow_mut().schedule_once(
+                            request.after,
+                            request.generation,
+                            self.as_target(),
+                        );
+                    }
+                } else {
+                    self.ivars().timer.borrow_mut().cancel();
+                }
             }
             Action::Blocked(Blocked::SeparatorRightOfIcon) => {
                 self.set_warning(Text::WarningSeparatorOrder);
