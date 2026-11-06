@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Rust
+/target/
+**/*.rs.bk
+
+# Build artifacts
+*.app
+*.dmg
+dist/
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# Local env
+.env
+.env.*
+!.env.example
+
+# Agent scratch
+temp/
