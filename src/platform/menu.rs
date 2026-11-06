@@ -1,6 +1,7 @@
 //! The icon's menu. Rebuilt every time it opens so it always shows the current state.
 
 use crate::core::l10n::{Lang, Text, text};
+use crate::core::login::LoginMenuItem;
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, Sel};
 use objc2::{MainThreadMarker, MainThreadOnly, sel};
@@ -12,12 +13,14 @@ use objc2_foundation::{NSPoint, NSString};
 pub struct MenuState {
     /// Problems to explain at the top of the menu.
     pub warnings: Vec<Text>,
+    pub launch_at_login: Option<LoginMenuItem>,
 }
 
 /// Selectors the menu sends to its target.
 #[derive(Debug, Clone, Copy)]
 pub struct MenuActions {
     pub about: Sel,
+    pub toggle_login: Sel,
 }
 
 /// Builds the menu and pops it up under `button`.
@@ -47,6 +50,27 @@ pub fn show(
         Some(actions.about),
         Some(target),
     );
+    if let Some(login) = state.launch_at_login {
+        let item = add(
+            &menu,
+            mtm,
+            text(lang, Text::MenuLaunchAtLogin),
+            Some(actions.toggle_login),
+            Some(target),
+        );
+        item.setState(if login.checked {
+            objc2_app_kit::NSControlStateValueOn
+        } else {
+            objc2_app_kit::NSControlStateValueOff
+        });
+        if login.action.is_none() {
+            item.setEnabled(false);
+        }
+        if let Some(note) = login.note {
+            let note_item = add(&menu, mtm, text(lang, note), None, None);
+            note_item.setEnabled(false);
+        }
+    }
     menu.addItem(&NSMenuItem::separatorItem(mtm));
     // `terminate:` with no target travels the responder chain to NSApplication.
     let quit = add(

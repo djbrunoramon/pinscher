@@ -3,9 +3,10 @@
 use crate::core::bar::{Action, Bar, Blocked};
 use crate::core::config::Config;
 use crate::core::l10n::{Lang, Text};
+use crate::core::login::LoginRequest;
 use crate::platform::menu::{self, MenuActions, MenuState};
 use crate::platform::status_bar::StatusBar;
-use crate::platform::{language, paths};
+use crate::platform::{language, login_item, paths};
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, ProtocolObject};
 use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, sel};
@@ -83,6 +84,25 @@ define_class!(
             app.activate();
             app.orderFrontStandardAboutPanel(None);
         }
+
+        #[unsafe(method(toggleLaunchAtLogin:))]
+        fn toggle_launch_at_login(&self, _sender: Option<&AnyObject>) {
+            let request = crate::core::login::menu_item(login_item::state()).action;
+            match request {
+                Some(LoginRequest::Enable) => {
+                    if let Err(error) = login_item::enable() {
+                        tracing::warn!(code = error.code, "login item");
+                    }
+                }
+                Some(LoginRequest::Disable) => {
+                    if let Err(error) = login_item::disable() {
+                        tracing::warn!(code = error.code, "login item");
+                    }
+                }
+                Some(LoginRequest::OpenSettings) => login_item::open_settings(),
+                None => {}
+            }
+        }
     }
 );
 
@@ -144,9 +164,11 @@ impl AppDelegate {
         };
         let state = MenuState {
             warnings: self.ivars().warnings.borrow().clone(),
+            launch_at_login: Some(crate::core::login::menu_item(login_item::state())),
         };
         let actions = MenuActions {
             about: sel!(showAbout:),
+            toggle_login: sel!(toggleLaunchAtLogin:),
         };
         menu::show(mtm, self.lang(), &state, self.as_target(), actions, &button);
     }
