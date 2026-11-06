@@ -3,3 +3,4 @@
 pub mod bar;
 pub mod config;
 pub mod l10n;
+pub mod shortcut;
