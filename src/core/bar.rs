@@ -5,6 +5,8 @@
 //! pushed off screen. If the separator were to the right of the icon, collapsing would push the
 //! icon itself away and leave the user with no way back (AM-06), so that is refused.
 
+use std::time::Duration;
+
 /// What the menu bar currently shows.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Visibility {
@@ -42,10 +44,31 @@ pub enum Action {
     None,
 }
 
+/// A one-shot collapse request for the platform timer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CollapseTimer {
+    pub generation: u64,
+    pub after: Duration,
+}
+
 /// The show/hide state machine.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Bar {
     visibility: Visibility,
+    auto_hide: Option<Duration>,
+    generation: u64,
+    user_expanded: bool,
+}
+
+impl Default for Bar {
+    fn default() -> Self {
+        Self {
+            visibility: Visibility::Expanded,
+            auto_hide: None,
+            generation: 0,
+            user_expanded: false,
+        }
+    }
 }
 
 impl Bar {
@@ -58,6 +81,32 @@ impl Bar {
     #[must_use]
     pub fn visibility(&self) -> Visibility {
         self.visibility
+    }
+
+    /// Configures the one-shot delay used after a user expansion.
+    pub fn set_auto_hide(&mut self, auto_hide: Option<Duration>) {
+        self.auto_hide = auto_hide;
+    }
+
+    /// Returns the timer request for the current user expansion, if any.
+    #[must_use]
+    pub fn pending_collapse(&self) -> Option<CollapseTimer> {
+        if self.visibility == Visibility::Expanded && self.user_expanded {
+            self.auto_hide.map(|after| CollapseTimer {
+                generation: self.generation,
+                after,
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Handles a timer callback, ignoring callbacks for older visibility generations.
+    pub fn on_timer(&mut self, generation: u64, layout: Option<Layout>) -> Action {
+        if generation != self.generation || self.visibility != Visibility::Expanded {
+            return Action::None;
+        }
+        self.collapse(layout)
     }
 
     /// Flips between expanded and collapsed. `layout` is only needed to collapse.
@@ -92,6 +141,8 @@ impl Bar {
             return Action::None;
         }
         self.visibility = visibility;
+        self.generation = self.generation.wrapping_add(1);
+        self.user_expanded = visibility == Visibility::Expanded;
         Action::Apply(visibility)
     }
 }
@@ -170,5 +221,84 @@ mod tests {
         let mut bar = Bar::new();
         bar.collapse(Some(ORDERED));
         assert_eq!(bar.expand(), Action::Apply(Visibility::Expanded));
+    }
+
+    #[test]
+    fn auto_hide_schedules_after_user_expand() {
+        let mut bar = Bar::new();
+        bar.set_auto_hide(Some(Duration::from_secs(5)));
+        bar.collapse(Some(ORDERED));
+
+        assert_eq!(bar.expand(), Action::Apply(Visibility::Expanded));
+        assert_eq!(
+            bar.pending_collapse(),
+            Some(CollapseTimer {
+                generation: 2,
+                after: Duration::from_secs(5),
+            })
+        );
+    }
+
+    #[test]
+    fn auto_hide_off_schedules_nothing() {
+        let mut bar = Bar::new();
+        bar.set_auto_hide(None);
+        bar.collapse(Some(ORDERED));
+        bar.expand();
+
+        assert_eq!(bar.pending_collapse(), None);
+    }
+
+    #[test]
+    fn timer_collapses_when_current() {
+        let mut bar = Bar::new();
+        bar.set_auto_hide(Some(Duration::from_secs(5)));
+        bar.collapse(Some(ORDERED));
+        bar.expand();
+
+        assert_eq!(
+            bar.on_timer(2, Some(ORDERED)),
+            Action::Apply(Visibility::Collapsed)
+        );
+        assert_eq!(bar.visibility(), Visibility::Collapsed);
+    }
+
+    #[test]
+    fn stale_timer_is_ignored() {
+        let mut bar = Bar::new();
+        bar.set_auto_hide(Some(Duration::from_secs(5)));
+        bar.collapse(Some(ORDERED));
+        bar.expand();
+        bar.collapse(Some(ORDERED));
+        bar.expand();
+
+        assert_eq!(bar.on_timer(2, Some(ORDERED)), Action::None);
+        assert_eq!(bar.visibility(), Visibility::Expanded);
+    }
+
+    #[test]
+    fn timer_respects_order_guard() {
+        let mut bar = Bar::new();
+        bar.set_auto_hide(Some(Duration::from_secs(5)));
+        bar.collapse(Some(ORDERED));
+        bar.expand();
+        let swapped = Layout {
+            icon_x: 1100.0,
+            separator_x: 1200.0,
+        };
+
+        assert_eq!(
+            bar.on_timer(2, Some(swapped)),
+            Action::Blocked(Blocked::SeparatorRightOfIcon)
+        );
+        assert_eq!(bar.visibility(), Visibility::Expanded);
+    }
+
+    #[test]
+    fn launch_expansion_does_not_schedule() {
+        let mut bar = Bar::new();
+        bar.set_auto_hide(Some(Duration::from_secs(5)));
+
+        assert_eq!(bar.pending_collapse(), None);
     }
 }
