@@ -1,6 +1,7 @@
 //! Thin adapter over `SMAppService` for the main application login item.
 
 use crate::core::login::LoginState;
+use objc2_foundation::NSBundle;
 use objc2_service_management::{SMAppService, SMAppServiceStatus};
 
 /// The system error code returned by an enable/disable operation.
@@ -12,12 +13,26 @@ pub struct LoginError {
 /// Reads the real launch-at-login state from the operating system.
 #[must_use]
 pub fn state() -> LoginState {
+    // Login items need an app bundle; `cargo run` binaries can never register.
+    let bundle = NSBundle::mainBundle().bundlePath().to_string();
+    let is_app = std::path::Path::new(&bundle)
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("app"));
+    if !is_app {
+        return LoginState::Unavailable;
+    }
     // SAFETY: `mainAppService` is a pure constructor for the current app's service.
     let service = unsafe { SMAppService::mainAppService() };
     // SAFETY: `service` is a valid SMAppService returned by the system.
     match unsafe { service.status() }.0 {
         status if status == SMAppServiceStatus::Enabled.0 => LoginState::Enabled,
-        status if status == SMAppServiceStatus::NotRegistered.0 => LoginState::Disabled,
+        // A bundle that never registered reports NotFound; registering is still possible.
+        status
+            if status == SMAppServiceStatus::NotRegistered.0
+                || status == SMAppServiceStatus::NotFound.0 =>
+        {
+            LoginState::Disabled
+        }
         status if status == SMAppServiceStatus::RequiresApproval.0 => LoginState::RequiresApproval,
         _ => LoginState::Unavailable,
     }
