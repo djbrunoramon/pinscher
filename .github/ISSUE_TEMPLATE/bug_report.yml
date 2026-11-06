@@ -1,0 +1,46 @@
+name: Bug report
+description: Report a problem with Pinscher
+labels: [bug]
+body:
+  - type: input
+    id: pinscher-version
+    attributes:
+      label: Pinscher version
+      description: Include the release version or commit if running from source.
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+    validations:
+      required: true
+  - type: input
+    id: chip
+    attributes:
+      label: Mac chip
+      description: Apple silicon model or Intel.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. ...\n2. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected-actual
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Remove personal information before posting. Do not attach captured images.
+      render: text
+      placeholder: Run /usr/bin/log stream --level info --predicate 'subsystem == "io.github.djbrunoramon.pinscher"' and paste a short relevant excerpt.
+    validations:
+      required: false
