@@ -84,6 +84,13 @@ impl LayoutView {
             busy,
         };
         if self.snapshot.borrow().as_ref() == Some(&next) {
+            // A popup changes its value before the action runs. Restore the observed section
+            // even when a refused move leaves the underlying snapshot unchanged.
+            if let Some(dividers) = dividers {
+                for (control, item) in self.controls.borrow().iter() {
+                    control.selectItemAtIndex(section_index(section_at(item.frame.x, dividers)));
+                }
+            }
             return;
         }
         let previous_origin = self
@@ -134,6 +141,9 @@ impl LayoutView {
                 popup.selectItemAtIndex(section_index(section));
                 popup.setTag(isize::try_from(index).unwrap_or(-1));
                 popup.setEnabled(!busy);
+                if let Some(menu) = popup.menu() {
+                    menu.setAutoenablesItems(false);
+                }
                 if dividers.is_some_and(|d| d.always_hidden_x.is_none())
                     && let Some(item) = popup.itemAtIndex(2)
                 {

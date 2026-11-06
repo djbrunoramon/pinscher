@@ -94,7 +94,7 @@ fn en(text: Text) -> &'static str {
         Text::LayoutRefresh => "Refresh and Arrange…",
         Text::LayoutRestore => "Restore Saved Layout",
         Text::LayoutInstructions => {
-            "Refresh to reveal icons and arrange them. Close Settings to hide them again."
+            "Hidden icons stay visible while arranging. Close Settings to apply hiding."
         }
         Text::LayoutEmpty => "No items found. Allow Accessibility and refresh.",
         Text::LayoutBusy => "Moving an icon…",
@@ -160,7 +160,7 @@ fn pt_br(text: Text) -> &'static str {
         Text::LayoutRefresh => "Atualizar e organizar…",
         Text::LayoutRestore => "Restaurar organização salva",
         Text::LayoutInstructions => {
-            "Atualize para revelar os ícones e organizar. Feche os Ajustes para ocultá-los de novo."
+            "Ícones ocultos ficam visíveis durante a organização. Feche os Ajustes para ocultá-los."
         }
         Text::LayoutEmpty => "Nenhum item encontrado. Permita Acessibilidade e atualize.",
         Text::LayoutBusy => "Movendo um ícone…",

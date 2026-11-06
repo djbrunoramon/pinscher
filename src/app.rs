@@ -640,6 +640,7 @@ impl AppDelegate {
         }
         self.ivars().restore_queue.borrow_mut().clear();
         self.ivars().restoring.set(false);
+        self.ivars().layout_items.borrow_mut().clear();
         self.ivars().active_move.borrow_mut().take();
         if let Some(drag) = self.ivars().drag.borrow_mut().as_mut() {
             drag.cancel();
@@ -660,12 +661,13 @@ impl AppDelegate {
 
     fn refresh_layout_view(&self) {
         if let Some(settings) = self.ivars().settings.get() {
-            let busy = self
-                .ivars()
-                .drag
-                .borrow()
-                .as_ref()
-                .is_some_and(Drag::is_running);
+            let busy = !self.ivars().layout_session.get()
+                || self
+                    .ivars()
+                    .drag
+                    .borrow()
+                    .as_ref()
+                    .is_some_and(Drag::is_running);
             settings.layout.refresh(
                 &self.ivars().layout_items.borrow(),
                 self.dividers(),
@@ -698,10 +700,14 @@ impl AppDelegate {
             self.move_failed();
             return;
         };
-        let Ok(plan) = crate::core::drag::plan_for_section(&item, section, dividers, bounds, icon)
-        else {
-            self.move_failed();
-            return;
+        let plan = match crate::core::drag::plan_for_section(&item, section, dividers, bounds, icon)
+        {
+            Ok(plan) => plan,
+            Err(error) => {
+                tracing::warn!(?error, "move plan refused");
+                self.move_failed();
+                return;
+            }
         };
         let mut slot = self.ivars().drag.borrow_mut();
         let drag = slot.get_or_insert_with(|| Drag::new(self.mtm()));

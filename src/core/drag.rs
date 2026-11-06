@@ -68,7 +68,7 @@ pub enum PlanError {
     NoRoom,
     #[error("the item is already at the destination")]
     ZeroDistance,
-    #[error("the drag would cross the Pinscher icon")]
+    #[error("a drag endpoint is over the Pinscher icon")]
     ProtectedIcon,
 }
 
@@ -106,15 +106,17 @@ pub fn plan_for_section(
     {
         return Err(PlanError::InvalidDividers);
     }
-    if overlaps(item.frame, dividers.separator)
+    let (x, y) = item.frame.center();
+    let from = Point { x, y };
+    // AX and AppKit include different edge insets. Adjacent frames may overlap slightly;
+    // the actual mouse-down point must be outside the owned dividers, not the whole frame.
+    if dividers.separator.contains(from.x, from.y)
         || dividers
             .always_hidden
-            .is_some_and(|frame| overlaps(item.frame, frame))
+            .is_some_and(|frame| frame.contains(from.x, from.y))
     {
         return Err(PlanError::InvalidDividers);
     }
-    let (x, y) = item.frame.center();
-    let from = Point { x, y };
     // Drop into the divider's appropriate half. AppKit creates the insertion space during
     // the drag, so requiring an empty item-width gap would reject the default adjacent layout.
     let x = match section {
@@ -131,7 +133,7 @@ pub fn plan_for_section(
     if !menu_bar.contains(to.x, to.y) {
         return Err(PlanError::NoRoom);
     }
-    if overlaps(item.frame, icon) || icon.contains(to.x, to.y) {
+    if icon.contains(from.x, from.y) || icon.contains(to.x, to.y) {
         return Err(PlanError::ProtectedIcon);
     }
     if (from.x - to.x).abs() <= f64::EPSILON {
@@ -142,10 +144,6 @@ pub fn plan_for_section(
         to,
         item: item.clone(),
     })
-}
-
-fn overlaps(a: Rect, b: Rect) -> bool {
-    a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
 }
 
 fn valid_rect(rect: Rect) -> bool {
@@ -460,5 +458,39 @@ mod tests {
         let plan = plan_for_section(&item(800.0), Section::Visible, dividers, BAR, ICON).unwrap();
         assert!(plan.to().x() < ICON.x);
         assert!(plan.to().x() > dividers.separator.x + dividers.separator.width / 2.0);
+    }
+    #[test]
+    fn permits_adjacent_ax_item_with_fractional_frame_overlap() {
+        let item = MenuBarItem {
+            frame: Rect {
+                x: 1461.0,
+                y: 0.0,
+                width: 104.0,
+                height: 24.0,
+            },
+            ..MenuBarItem::default()
+        };
+        let dividers = DividerFrames {
+            separator: Rect {
+                x: 1431.0,
+                y: 0.0,
+                width: 31.5,
+                height: 24.0,
+            },
+            always_hidden: None,
+        };
+        let bounds = Rect {
+            x: 0.0,
+            y: 0.0,
+            width: 2056.0,
+            height: 24.0,
+        };
+        let icon = Rect {
+            x: 1601.0,
+            y: 0.0,
+            width: 38.5,
+            height: 24.0,
+        };
+        assert!(plan_for_section(&item, Section::Hidden, dividers, bounds, icon).is_ok());
     }
 }
