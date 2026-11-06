@@ -3,6 +3,7 @@
 use crate::core::bar::{Action, Bar, Blocked};
 use crate::core::config::Config;
 use crate::core::l10n::{Lang, Text};
+use crate::platform::hotkey::Hotkey;
 use crate::platform::menu::{self, MenuActions, MenuState};
 use crate::platform::status_bar::StatusBar;
 use crate::platform::{language, paths};
@@ -23,6 +24,7 @@ pub struct Ivars {
     config_path: OnceCell<Option<PathBuf>>,
     config: RefCell<Config>,
     status_bar: OnceCell<StatusBar>,
+    hotkey: OnceCell<Hotkey>,
     bar: RefCell<Bar>,
     warnings: RefCell<Vec<Text>>,
 }
@@ -63,11 +65,38 @@ define_class!(
             );
             tracing::debug!(count = items.len(), ?granted, "menu bar items");
             let _ = self.ivars().status_bar.set(status_bar);
+
+            let shortcut_text = self.ivars().config.borrow().shortcut.toggle.clone();
+            if !shortcut_text.is_empty() {
+                let result = crate::core::shortcut::parse(&shortcut_text)
+                    .map_err(|error| error.to_string())
+                    .and_then(|shortcut| {
+                        let mut hotkey = Hotkey::new(mtm).map_err(|error| error.to_string())?;
+                        hotkey
+                            .register(&shortcut)
+                            .map_err(|error| error.to_string())?;
+                        Ok(hotkey)
+                    });
+                match result {
+                    Ok(hotkey) => {
+                        let _ = self.ivars().hotkey.set(hotkey);
+                    }
+                    Err(error) => {
+                        self.set_warning(Text::WarningShortcutUnavailable);
+                        tracing::warn!(error = %error, "shortcut");
+                    }
+                }
+            }
             tracing::info!("launched");
         }
     }
 
     impl AppDelegate {
+        #[unsafe(method(hotkeyPressed:))]
+        fn hotkey_pressed(&self, _sender: Option<&AnyObject>) {
+            self.toggle();
+        }
+
         #[unsafe(method(iconClicked:))]
         fn icon_clicked(&self, _sender: Option<&AnyObject>) {
             let mtm = self.mtm();
