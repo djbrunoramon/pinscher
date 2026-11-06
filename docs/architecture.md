@@ -27,8 +27,16 @@ The separator expands to 10,000 points when collapsed. This is intentionally wid
 
 ## Configuration
 
-`core::config` owns the TOML schema, defaults, validation, and warnings. Platform code handles file-system access and passes values to the core without moving product decisions into adapters.
+`core::config` owns the TOML schema, defaults, validation, and warnings. The existing load/save functions receive their path from the platform and bound file size on both reads and writes. Verified section changes are rejected if they would exceed the schema limits.
 
 ## Logging
 
 Logs use the `io.github.djbrunoramon.pinscher` subsystem and go to the unified macOS log. Log keys and error kinds only; do not log user paths, other apps' names, configuration values, or captured images.
+
+## Advanced features
+
+Accessibility discovers menu extras, including macOS 27's shared menu-bar items. The second bar uses bounded asynchronous ScreenCaptureKit captures of visible item frames. Before accepting a result, core checks geometry, identity and frame stability. Snapshots remain in memory and are cleared when capture access is revoked; missing snapshots use app icons. No automatic expansion is performed for capture.
+
+The Layout tab reveals both dividers during an explicit arrangement session. Core produces an insertion-point drag plan within one menu-bar rectangle; platform checks the live identity, frame and divider geometry before posting the down and drag events. Timers release the mouse button without blocking the main thread. The delegate rediscovers the item and persists its section only after verifying the result. Saved sections are reapplied only through the user's restore action.
+
+The insertion targets and event timing need validation with Accessibility enabled on each supported macOS version. A successful event post alone is never treated as a confirmed move.

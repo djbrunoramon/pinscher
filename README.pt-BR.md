@@ -13,7 +13,8 @@ Em desenvolvimento inicial. O comportamento e a configuração podem mudar entre
 - **Disponível:** Mostrar ou ocultar itens da barra de menus com um clique.
 - **Disponível:** Mover o separador com ⌘ e arrastar para escolher quais itens ficam ocultos à esquerda dele.
 - **Disponível:** Alternar a visibilidade com ⌥⌘P e configurar ocultação automática e início com o login nas Preferências.
-- **Planejado:** Uma segunda barra, um modo sempre oculto e reordenação de itens nas Preferências.
+- **Disponível:** Seção sempre oculta opcional, com separador próprio.
+- **Experimental:** Segunda barra (⌥ + clique), organização na aba Layout e restauração explícita das seções salvas. A validação real da captura e do arraste exige liberar as permissões do sistema.
 
 ## Requisitos
 
@@ -37,11 +38,14 @@ xattr -dr com.apple.quarantine /Applications/Pinscher.app
 - Pressione ⌥⌘P para alternar a visibilidade.
 - Segure ⌘ e arraste um item da barra de menus para escolher quais itens permanecem ocultos à esquerda do separador. O separador precisa ficar à esquerda do ícone do Pinscher; caso contrário, o Pinscher mostra um aviso e não oculta os itens.
 - Ative **Iniciar com o login** pelo menu. Isso funciona quando o Pinscher é executado a partir do app e pode exigir aprovação nos Ajustes do Sistema.
-- As Preferências incluem configurações de ocultação automática e do atalho global.
+- Os Ajustes incluem ocultação automática, gravação do atalho e seção sempre oculta. Mantenha o divisor dessa seção à esquerda do separador normal, e o separador normal à esquerda do Pinscher. Use **Revelar todos os ícones para organizar…** no menu para organizar os itens ocultos.
+- Ative a segunda barra nos Ajustes, permita Acessibilidade e Gravação de Tela quando solicitado e use ⌥ + clique no Pinscher. Ela usa imagens em cache na memória e, quando não houver imagem, o ícone do aplicativo. Ao acionar um item, ele aparece temporariamente; a visibilidade anterior retorna após o atraso configurado, inclusive com ocultação automática desligada.
+- Em **Ajustes › Layout**, clique em **Atualizar e organizar…** e escolha a seção de cada item. Fechar os Ajustes encerra a organização. **Restaurar organização salva** reaplica as seções sob demanda; o app não move itens automaticamente ao iniciar.
+- Itens ausentes, com identificadores ambíguos ou sem espaço na tela podem ser ignorados. Verifique a movimentação e a ativação dos itens na sua versão do macOS antes de depender desses recursos experimentais.
 
 ## Permissões e privacidade
 
-O recurso básico de mostrar e ocultar não solicita permissões de Gravação de Tela nem de Acessibilidade. Recursos avançados que inspecionem ou controlem outros itens da barra de menus podem exigir Gravação de Tela para capturar sua aparência e Acessibilidade para interagir com eles. Esses recursos estão planejados e não fazem parte do comportamento básico atual.
+O recurso básico de mostrar e ocultar não solicita permissões de Gravação de Tela nem de Acessibilidade. Recursos avançados que inspecionem ou controlem outros itens da barra de menus podem exigir Gravação de Tela para capturar sua aparência e Acessibilidade para interagir com eles. As permissões só são solicitadas ao ativar a segunda barra ou iniciar a organização explicitamente. Sem acesso, os recursos avançados ficam indisponíveis e o modo básico continua funcionando. Após autorizar, ative novamente o recurso ou atualize a aba Layout.
 
 O Pinscher não faz solicitações de rede e não tem telemetria. Capturas usadas por recursos avançados ficam na memória; o Pinscher não salva imagens capturadas.
 
