@@ -34,5 +34,6 @@ jobs:
             target
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
       - run: cargo fmt --check
+      - run: ./scripts/check-arch.sh
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked

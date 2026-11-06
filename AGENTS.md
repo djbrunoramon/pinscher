@@ -16,6 +16,7 @@ Pinscher is a macOS menu bar manager written in Rust. It talks to AppKit directl
 | Tests | `cargo test` |
 | Lint | `cargo clippy --all-targets -- -D warnings` |
 | Format | `cargo fmt` (CI runs `cargo fmt --check`) |
+| Architecture rules | `./scripts/check-arch.sh` |
 | App bundle | `./scripts/bundle.sh` (universal `dist/Pinscher.app`, ad-hoc signed) |
 | Read unified logs | `/usr/bin/log stream --level info --predicate 'subsystem == "io.github.djbrunoramon.pinscher"'` |
 
