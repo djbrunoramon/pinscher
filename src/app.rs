@@ -56,6 +56,12 @@ define_class!(
 
             let status_bar = StatusBar::new(mtm, lang, self.as_target(), sel!(iconClicked:));
             tracing::debug!(layout = ?status_bar.layout(mtm), "status items created");
+            let granted = crate::platform::permissions::granted();
+            let items = crate::core::layout::menu_bar_items(
+                crate::platform::window_list::windows(),
+                i32::try_from(std::process::id()).unwrap_or_default(),
+            );
+            tracing::debug!(count = items.len(), ?granted, "menu bar items");
             let _ = self.ivars().status_bar.set(status_bar);
             tracing::info!("launched");
         }

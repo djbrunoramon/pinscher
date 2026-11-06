@@ -4,4 +4,6 @@ pub mod language;
 pub mod logging;
 pub mod menu;
 pub mod paths;
+pub mod permissions;
 pub mod status_bar;
+pub mod window_list;

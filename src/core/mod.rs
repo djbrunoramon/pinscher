@@ -3,3 +3,5 @@
 pub mod bar;
 pub mod config;
 pub mod l10n;
+pub mod layout;
+pub mod permissions;
