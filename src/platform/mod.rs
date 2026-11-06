@@ -1,3 +1,5 @@
 //! Adapters over macOS APIs. Keep them thin: decisions belong in `core`.
 
+pub mod language;
 pub mod logging;
+pub mod paths;
