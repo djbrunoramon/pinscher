@@ -121,7 +121,7 @@ pub enum Warning {
 }
 
 /// Result of [`load`]: always a usable config, plus what went wrong on the way.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Loaded {
     pub config: Config,
     pub warnings: Vec<Warning>,
