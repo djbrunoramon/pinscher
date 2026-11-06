@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Experimental secondary bar with bounded, memory-only ScreenCaptureKit snapshots and app-icon fallback.
 - Layout tab with validated command-drag requests, verified persistence and explicit saved-layout restoration.
 - Hide icons as soon as Pinscher starts (and after every login), with a Settings switch; if macOS has not placed the items yet it retries for about 20 seconds.
-- App icon.
+- App icon, and a menu bar icon of a miniature pinscher in profile.
 - The Layout tab loads when Settings opens, follows the menu bar while it is visible, and shows each item's app icon and name.
 
 ### Fixed
