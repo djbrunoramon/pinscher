@@ -4,5 +4,6 @@ pub mod bar;
 pub mod config;
 pub mod l10n;
 pub mod layout;
+pub mod login;
 pub mod permissions;
 pub mod shortcut;
