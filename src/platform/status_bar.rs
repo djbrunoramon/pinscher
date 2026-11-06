@@ -2,7 +2,7 @@
 //!
 //! Holds no decisions: `core::bar` decides, this module only reads positions and applies state.
 
-use crate::core::bar::{Divider, Layout, Visibility};
+use crate::core::bar::{Divider, Layout, Visibility, collapsed_length};
 use crate::core::l10n::{Lang, Text, text};
 use objc2::MainThreadMarker;
 use objc2::rc::Retained;
@@ -14,9 +14,6 @@ use objc2_app_kit::{
 use objc2_foundation::NSString;
 use std::cell::RefCell;
 use std::rc::Rc;
-
-/// Wide enough to push every item to its left off any screen.
-const COLLAPSED_LENGTH: f64 = 10_000.0;
 
 /// The status items Pinscher owns.
 #[derive(Debug, Clone)]
@@ -74,11 +71,22 @@ impl StatusBar {
         })
     }
 
+    /// Width of a collapsed separator for the screen the icon is on.
+    fn collapsed_length(&self, mtm: MainThreadMarker) -> f64 {
+        let width = self
+            .icon
+            .button(mtm)
+            .and_then(|button| button.window())
+            .and_then(|window| window.screen())
+            .map_or(0.0, |screen| screen.frame().size.width);
+        collapsed_length(width)
+    }
+
     /// Shows `visibility` by resizing the separator.
     pub fn apply(&self, mtm: MainThreadMarker, visibility: Visibility) {
         let collapsed = visibility == Visibility::Collapsed;
         self.separator.setLength(if collapsed {
-            COLLAPSED_LENGTH
+            self.collapsed_length(mtm)
         } else {
             NSVariableStatusItemLength
         });
@@ -125,7 +133,7 @@ impl StatusBar {
         };
         let collapsed = state == Divider::Collapsed;
         let length = if collapsed {
-            COLLAPSED_LENGTH
+            self.collapsed_length(mtm)
         } else {
             NSVariableStatusItemLength
         };

@@ -17,6 +17,28 @@ pub enum Visibility {
     Collapsed,
 }
 
+/// Longest width macOS 27 still honors for a status item is roughly half the screen width; a
+/// wider item is ignored (it takes no space and pushes nothing). Measured on macOS 27 with a
+/// 2056 pt display: 950 pt hid the neighbours to its left, 1020 pt and above did not.
+const COLLAPSED_SCREEN_FRACTION: f64 = 0.45;
+/// Upper bound, in case the limit is absolute rather than relative to the screen.
+const COLLAPSED_MAX_LENGTH: f64 = 900.0;
+/// Width used when the screen size is unknown.
+const COLLAPSED_FALLBACK_LENGTH: f64 = 600.0;
+
+/// Width of a collapsed separator on a screen `screen_width` points wide.
+///
+/// Items to the left of a wide separator are pushed out of the visible menu bar. The width must
+/// stay below what macOS accepts, or the separator stops working altogether.
+#[must_use]
+pub fn collapsed_length(screen_width: f64) -> f64 {
+    if screen_width.is_finite() && screen_width > 0.0 {
+        (screen_width * COLLAPSED_SCREEN_FRACTION).min(COLLAPSED_MAX_LENGTH)
+    } else {
+        COLLAPSED_FALLBACK_LENGTH
+    }
+}
+
 /// Horizontal screen position (left edge, in points) of the items Pinscher owns.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Layout {
@@ -227,6 +249,29 @@ mod tests {
         icon_x: 1200.0,
         separator_x: 1100.0,
     };
+
+    #[test]
+    fn collapsed_length_stays_under_the_limit_macos_accepts() {
+        // 2056 pt: 950 pt worked and 1020 pt did not.
+        assert!((collapsed_length(2056.0) - 900.0).abs() < f64::EPSILON);
+        assert!(collapsed_length(3440.0) <= 900.0);
+    }
+
+    #[test]
+    fn collapsed_length_scales_down_on_small_screens() {
+        assert!((collapsed_length(1440.0) - 648.0).abs() < f64::EPSILON);
+        assert!(collapsed_length(1440.0) < 1440.0 / 2.0);
+    }
+
+    #[test]
+    fn collapsed_length_falls_back_for_unknown_screens() {
+        for width in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert!(
+                (collapsed_length(width) - 600.0).abs() < f64::EPSILON,
+                "{width}"
+            );
+        }
+    }
 
     #[test]
     fn starts_expanded() {
