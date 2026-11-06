@@ -8,6 +8,8 @@
 	<string>Pinscher</string>
 	<key>CFBundleExecutable</key>
 	<string>pinscher</string>
+	<key>CFBundleIconFile</key>
+	<string>Pinscher</string>
 	<key>CFBundleIdentifier</key>
 	<string>io.github.djbrunoramon.pinscher</string>
 	<key>CFBundleInfoDictionaryVersion</key>

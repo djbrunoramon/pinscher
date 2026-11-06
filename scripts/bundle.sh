@@ -41,6 +41,7 @@ lipo -create \
   target/x86_64-apple-darwin/release/pinscher \
   -output "$APP/Contents/MacOS/pinscher"
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" packaging/Info.plist > "$APP/Contents/Info.plist"
+cp packaging/Pinscher.icns "$APP/Contents/Resources/Pinscher.icns"
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
 
 # Only Developer ID signatures are timestamped (that is what notarization needs); a development
