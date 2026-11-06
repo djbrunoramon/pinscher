@@ -11,7 +11,7 @@ use objc2_app_kit::{
     NSCellImagePosition, NSEventMask, NSImage, NSScreen, NSStatusBar, NSStatusBarButton,
     NSStatusItem, NSVariableStatusItemLength,
 };
-use objc2_foundation::NSString;
+use objc2_foundation::{NSSize, NSString};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -34,7 +34,7 @@ impl StatusBar {
         let icon = bar.statusItemWithLength(NSVariableStatusItemLength);
         icon.setAutosaveName(Some(&NSString::from_str("pinscher.icon")));
         if let Some(button) = icon.button(mtm) {
-            set_symbol(&button, "dog.fill", text(lang, Text::IconAccessibility));
+            set_icon(&button, text(lang, Text::IconAccessibility));
             button.setToolTip(Some(&NSString::from_str(text(lang, Text::IconTooltip))));
             // SAFETY: `target` outlives the status item (it is the app delegate) and `action`
             // is a method it implements with the `-(void)x:(id)sender` signature.
@@ -196,6 +196,18 @@ impl StatusBar {
     #[must_use]
     pub fn icon_button(&self, mtm: MainThreadMarker) -> Option<Retained<NSStatusBarButton>> {
         self.icon.button(mtm)
+    }
+}
+
+/// The menu bar icon: the pinscher template image shipped in the app bundle, or, when running
+/// outside a bundle (`cargo run`), a system symbol.
+fn set_icon(button: &NSStatusBarButton, description: &str) {
+    if let Some(image) = NSImage::imageNamed(&NSString::from_str("PinscherTemplate")) {
+        image.setSize(NSSize::new(18.0, 18.0));
+        image.setTemplate(true);
+        button.setImage(Some(&image));
+    } else {
+        set_symbol(button, "dog.fill", description);
     }
 }
 
