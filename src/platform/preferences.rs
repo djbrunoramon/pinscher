@@ -25,6 +25,7 @@ pub struct SettingsState {
     pub shortcut_unavailable: bool,
     pub auto_hide: bool,
     pub auto_hide_delay: u32,
+    pub hide_on_launch: bool,
     pub launch_at_login: bool,
     pub launch_at_login_enabled: bool,
     pub launch_at_login_note: Option<Text>,
@@ -41,6 +42,7 @@ pub struct SettingsActions {
     pub clear_shortcut: Sel,
     pub auto_hide: Sel,
     pub auto_hide_delay: Sel,
+    pub hide_on_launch: Sel,
     pub launch_at_login: Sel,
     pub always_hidden: Sel,
     pub secondary_bar: Sel,
@@ -59,6 +61,7 @@ pub struct SettingsWindow {
     record: Retained<NSButton>,
     shortcut_warning: Retained<NSTextField>,
     auto_hide: Retained<NSButton>,
+    hide_on_launch: Retained<NSButton>,
     delay: Retained<NSStepper>,
     delay_value: Retained<NSTextField>,
     launch_at_login: Retained<NSButton>,
@@ -135,6 +138,12 @@ impl SettingsWindow {
             ],
         );
 
+        let hide_on_launch = checkbox(
+            mtm,
+            t(Text::SettingsHideOnLaunch),
+            target,
+            actions.hide_on_launch,
+        );
         let launch_at_login = checkbox(
             mtm,
             t(Text::MenuLaunchAtLogin),
@@ -177,6 +186,7 @@ impl SettingsWindow {
                 &shortcut_row,
                 &shortcut_warning,
                 &auto_hide_row,
+                &hide_on_launch,
                 &launch_at_login,
                 &launch_at_login_note,
                 &heading(mtm, t(Text::SettingsAdvanced)),
@@ -221,6 +231,7 @@ impl SettingsWindow {
             record,
             shortcut_warning,
             auto_hide,
+            hide_on_launch,
             delay,
             delay_value,
             launch_at_login,
@@ -242,6 +253,12 @@ impl SettingsWindow {
             self.window.center();
         }
         self.window.makeKeyAndOrderFront(None);
+    }
+
+    /// Whether the window is on screen.
+    #[must_use]
+    pub fn is_visible(&self) -> bool {
+        self.window.isVisible()
     }
 
     /// Whether the window is the key window (it receives the shortcut recorder's key presses).
@@ -272,6 +289,7 @@ impl SettingsWindow {
         self.delay_value
             .setStringValue(&NSString::from_str(&state.auto_hide_delay.to_string()));
 
+        set_on(&self.hide_on_launch, state.hide_on_launch);
         set_on(&self.launch_at_login, state.launch_at_login);
         self.launch_at_login
             .setEnabled(state.launch_at_login_enabled);

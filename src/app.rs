@@ -47,6 +47,10 @@ pub struct Ivars {
     secondary_items: RefCell<Vec<MenuBarItem>>,
     layout_items: RefCell<Vec<MenuBarItem>>,
     layout_session: Cell<bool>,
+    last_follow: Cell<Option<std::time::Instant>>,
+    /// Launch-time collapse still being attempted, and how many attempts it has used.
+    startup_collapse: Cell<bool>,
+    startup_attempts: Cell<u8>,
     layout_needs_refresh: Cell<bool>,
     last_discovery: Cell<Option<std::time::Instant>>,
     drag: RefCell<Option<Drag>>,
@@ -113,6 +117,7 @@ define_class!(
                 Err(error) => tracing::warn!(error = %error, "shortcut manager"),
             }
             self.apply_shortcut();
+            self.schedule_startup_collapse();
             tracing::info!("launched");
         }
     }
@@ -139,10 +144,14 @@ define_class!(
                     self.refresh_dividers();
                     if visibility == crate::core::bar::Visibility::Collapsed {
                         self.ivars().timer.borrow_mut().cancel();
+                        self.ivars().startup_collapse.set(false);
                     }
                 }
-                Action::Blocked(blocked) => tracing::debug!(?blocked, "auto-hide collapse blocked"),
-                Action::None => {}
+                Action::Blocked(blocked) => {
+                    tracing::debug!(?blocked, "auto-hide collapse blocked");
+                    self.retry_startup_collapse();
+                }
+                Action::None => self.ivars().startup_collapse.set(false),
             }
         }
 
@@ -211,6 +220,13 @@ define_class!(
             self.ivars().config.borrow_mut().auto_hide.enabled = preferences::is_on(sender);
             self.save_config();
             self.apply_auto_hide();
+            self.refresh_settings();
+        }
+
+        #[unsafe(method(settingsHideOnLaunch:))]
+        fn settings_hide_on_launch(&self, sender: &NSButton) {
+            self.ivars().config.borrow_mut().auto_hide.hide_on_launch = preferences::is_on(sender);
+            self.save_config();
             self.refresh_settings();
         }
 
@@ -312,7 +328,12 @@ define_class!(
 
     unsafe impl NSWindowDelegate for AppDelegate {
         #[unsafe(method(windowWillClose:))]
-        fn window_will_close(&self, _notification: &NSNotification) { self.end_layout(); }
+        fn window_will_close(&self, _notification: &NSNotification) {
+            self.end_layout();
+            // The window is still flagged visible while it closes, so stop on the next turn.
+            self.ivars().advanced_timer.borrow_mut().cancel();
+            self.configure_advanced_timer();
+        }
 
         #[unsafe(method(windowDidResignKey:))]
         fn window_did_resign_key(&self, _notification: &NSNotification) {
@@ -328,6 +349,7 @@ fn settings_actions() -> SettingsActions {
         clear_shortcut: sel!(settingsClearShortcut:),
         auto_hide: sel!(settingsAutoHide:),
         auto_hide_delay: sel!(settingsAutoHideDelay:),
+        hide_on_launch: sel!(settingsHideOnLaunch:),
         launch_at_login: sel!(settingsLaunchAtLogin:),
         always_hidden: sel!(settingsAlwaysHidden:),
         secondary_bar: sel!(settingsSecondaryBar:),
@@ -534,9 +556,15 @@ impl AppDelegate {
     }
 
     fn configure_advanced_timer(&self) {
+        let settings_visible = self
+            .ivars()
+            .settings
+            .get()
+            .is_some_and(SettingsWindow::is_visible);
         if self.ivars().config.borrow().advanced.secondary_bar
             || self.ivars().layout_session.get()
             || self.ivars().pending_press.borrow().is_some()
+            || settings_visible
         {
             self.ivars()
                 .advanced_timer
@@ -864,6 +892,7 @@ impl AppDelegate {
             self.refresh_settings();
             return;
         }
+        self.follow_menu_bar_if_due();
         let urgent = self.ivars().layout_needs_refresh.get()
             || self.ivars().active_move.borrow().is_some()
             || self.ivars().pending_press.borrow().is_some()
@@ -959,7 +988,85 @@ impl AppDelegate {
         });
         settings.refresh(&self.settings_state());
         settings.show(mtm);
+        self.follow_menu_bar();
+        self.configure_advanced_timer();
+    }
+
+    /// Passive list for the Layout tab: about every 1.5 s while Settings is visible.
+    fn follow_menu_bar_if_due(&self) {
+        let due = self
+            .ivars()
+            .last_follow
+            .get()
+            .is_none_or(|last| last.elapsed() >= Duration::from_millis(1500));
+        if due {
+            self.ivars()
+                .last_follow
+                .set(Some(std::time::Instant::now()));
+            self.follow_menu_bar();
+        }
+    }
+
+    /// Keeps the Layout list in step with the real menu bar while Settings is visible and no
+    /// arranging session is running. Reading is passive: nothing is revealed or moved.
+    fn follow_menu_bar(&self) {
+        let visible = self
+            .ivars()
+            .settings
+            .get()
+            .is_some_and(SettingsWindow::is_visible);
+        if !visible || self.ivars().layout_session.get() {
+            return;
+        }
+        if permissions::granted().accessibility {
+            *self.ivars().layout_items.borrow_mut() = Self::live_items();
+            self.ivars().layout_note.set(Some(Text::LayoutGuide));
+        } else {
+            self.ivars().layout_items.borrow_mut().clear();
+            self.ivars()
+                .layout_note
+                .set(Some(Text::SettingsAccessibilityMissing));
+        }
         self.refresh_layout_view();
+    }
+
+    /// Hides the icons shortly after launch (and so after every login), like Bartender does.
+    fn schedule_startup_collapse(&self) {
+        if !self.ivars().config.borrow().auto_hide.hide_on_launch {
+            return;
+        }
+        self.ivars().startup_collapse.set(true);
+        self.ivars().startup_attempts.set(0);
+        let request = self
+            .ivars()
+            .bar
+            .borrow()
+            .startup_collapse(crate::core::bar::STARTUP_COLLAPSE_DELAY);
+        self.ivars().timer.borrow_mut().schedule_once(
+            request.after,
+            request.generation,
+            self.as_target(),
+        );
+    }
+
+    /// The first collapse can fail while macOS is still placing the status items after login;
+    /// try again shortly. Does nothing once the user has taken over.
+    fn retry_startup_collapse(&self) {
+        if !self.ivars().startup_collapse.get() {
+            return;
+        }
+        let attempt = self.ivars().startup_attempts.get();
+        let Some(after) = crate::core::bar::startup_retry(attempt) else {
+            tracing::info!("startup collapse gave up");
+            self.ivars().startup_collapse.set(false);
+            return;
+        };
+        self.ivars().startup_attempts.set(attempt + 1);
+        let generation = self.ivars().bar.borrow().startup_collapse(after).generation;
+        self.ivars()
+            .timer
+            .borrow_mut()
+            .schedule_once(after, generation, self.as_target());
     }
 
     fn apply_auto_hide(&self) {
@@ -1019,6 +1126,7 @@ impl AppDelegate {
                 .contains(&Text::WarningShortcutUnavailable),
             auto_hide: config.auto_hide.enabled,
             auto_hide_delay: config.auto_hide.delay_secs,
+            hide_on_launch: config.auto_hide.hide_on_launch,
             launch_at_login: login.checked,
             launch_at_login_enabled: login.action.is_some(),
             launch_at_login_note: login.note,

@@ -41,6 +41,8 @@ pub enum Text {
     LayoutRefresh,
     LayoutRestore,
     LayoutInstructions,
+    LayoutGuide,
+    LayoutSystemItem,
     LayoutEmpty,
     LayoutBusy,
     LayoutMoveFailed,
@@ -72,6 +74,7 @@ pub enum Text {
     SettingsShortcutNone,
     SettingsAutoHide,
     SettingsAutoHideSeconds,
+    SettingsHideOnLaunch,
     SettingsAdvanced,
     SettingsAlwaysHidden,
     SettingsSecondaryBar,
@@ -93,6 +96,10 @@ fn en(text: Text) -> &'static str {
         Text::SettingsLayout => "Layout",
         Text::LayoutRefresh => "Refresh and Arrange…",
         Text::LayoutRestore => "Restore Saved Layout",
+        Text::LayoutGuide => {
+            "This list follows your menu bar. Hold ⌘ and drag an icon left of the Pinscher bar to hide it, or right of it to show it."
+        }
+        Text::LayoutSystemItem => "System item",
         Text::LayoutInstructions => {
             "Hidden icons stay visible while arranging. Close Settings to apply hiding."
         }
@@ -142,6 +149,7 @@ fn en(text: Text) -> &'static str {
         Text::SettingsShortcutNone => "None",
         Text::SettingsAutoHide => "Hide icons again automatically after",
         Text::SettingsAutoHideSeconds => "seconds",
+        Text::SettingsHideOnLaunch => "Hide icons as soon as Pinscher starts",
         Text::SettingsAdvanced => "Advanced",
         Text::SettingsAlwaysHidden => "Add an always-hidden section (second separator)",
         Text::SettingsSecondaryBar => {
@@ -159,6 +167,10 @@ fn pt_br(text: Text) -> &'static str {
         Text::SettingsLayout => "Layout",
         Text::LayoutRefresh => "Atualizar e organizar…",
         Text::LayoutRestore => "Restaurar organização salva",
+        Text::LayoutGuide => {
+            "Esta lista acompanha a sua barra de menus. Segure ⌘ e arraste um ícone para a esquerda da barra do Pinscher para ocultá-lo, ou para a direita para mostrá-lo."
+        }
+        Text::LayoutSystemItem => "Item do sistema",
         Text::LayoutInstructions => {
             "Ícones ocultos ficam visíveis durante a organização. Feche os Ajustes para ocultá-los."
         }
@@ -218,6 +230,7 @@ fn pt_br(text: Text) -> &'static str {
         Text::SettingsShortcutNone => "Nenhum",
         Text::SettingsAutoHide => "Ocultar ícones de novo automaticamente após",
         Text::SettingsAutoHideSeconds => "segundos",
+        Text::SettingsHideOnLaunch => "Ocultar os ícones assim que o Pinscher abrir",
         Text::SettingsAdvanced => "Avançado",
         Text::SettingsAlwaysHidden => "Adicionar seção sempre oculta (segundo separador)",
         Text::SettingsSecondaryBar => {

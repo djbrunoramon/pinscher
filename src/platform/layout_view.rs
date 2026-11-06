@@ -6,7 +6,10 @@ use crate::core::layout::{Dividers, MenuBarItem, section_at};
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, Sel};
 use objc2::{MainThreadMarker, MainThreadOnly};
-use objc2_app_kit::{NSButton, NSFont, NSPopUpButton, NSScrollView, NSTextField, NSView};
+use objc2_app_kit::{
+    NSButton, NSFont, NSImageView, NSPopUpButton, NSRunningApplication, NSScrollView, NSTextField,
+    NSView,
+};
 use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
 use std::cell::RefCell;
 
@@ -48,10 +51,10 @@ impl LayoutView {
             &NSString::from_str(text(lang, Text::LayoutInstructions)),
             mtm,
         );
-        note.setFrame(rect(12.0, 350.0, 612.0, 43.0));
+        note.setFrame(rect(12.0, 340.0, 612.0, 54.0));
         view.addSubview(&note);
         let scroll =
-            NSScrollView::initWithFrame(NSScrollView::alloc(mtm), rect(10.0, 10.0, 620.0, 335.0));
+            NSScrollView::initWithFrame(NSScrollView::alloc(mtm), rect(10.0, 10.0, 620.0, 325.0));
         scroll.setHasVerticalScroller(true);
         view.addSubview(&scroll);
         Self {
@@ -118,14 +121,7 @@ impl LayoutView {
             for (index, item) in items.iter().take(256).enumerate().filter(|(_, item)| {
                 dividers.is_some_and(|d| section_at(item.frame.x, d) == section)
             }) {
-                let title = if item.title.is_empty() {
-                    &item.owner
-                } else {
-                    &item.title
-                };
-                let label = NSTextField::labelWithString(&NSString::from_str(title), mtm);
-                label.setFrame(rect(12.0, y, 345.0, 24.0));
-                document.addSubview(&label);
+                self.add_identity(&document, item, y);
                 let popup = NSPopUpButton::initWithFrame_pullsDown(
                     NSPopUpButton::alloc(mtm),
                     rect(365.0, y - 3.0, 225.0, 30.0),
@@ -170,6 +166,27 @@ impl LayoutView {
         self.scroll.setDocumentView(Some(&document));
         document.scrollPoint(previous_origin.unwrap_or(NSPoint::new(0.0, height)));
     }
+    /// Adds the app icon and the readable name of `item` at row `y`.
+    fn add_identity(&self, document: &NSView, item: &MenuBarItem, y: f64) {
+        let mtm = self.view.mtm();
+        let app = NSRunningApplication::runningApplicationWithProcessIdentifier(item.owner_pid);
+        if let Some(icon) = app.as_ref().and_then(|app| app.icon()) {
+            let image = NSImageView::imageViewWithImage(&icon, mtm);
+            image.setFrame(rect(12.0, y, 24.0, 24.0));
+            document.addSubview(&image);
+        }
+        let title = display_name(
+            item,
+            app.as_ref()
+                .and_then(|app| app.localizedName())
+                .map(|name| name.to_string()),
+            text(self.lang, Text::LayoutSystemItem),
+        );
+        let label = NSTextField::labelWithString(&NSString::from_str(&title), mtm);
+        label.setFrame(rect(44.0, y, 313.0, 24.0));
+        document.addSubview(&label);
+    }
+
     /// Only current controls can issue moves; an old popup from a replaced snapshot is refused.
     #[must_use]
     pub fn item_for_sender(&self, sender: &NSPopUpButton) -> Option<MenuBarItem> {
@@ -180,6 +197,19 @@ impl LayoutView {
                 std::ptr::eq(std::ptr::from_ref(&**control), std::ptr::from_ref(sender))
             })
             .map(|(_, item)| item.clone())
+    }
+}
+
+/// What to call an item: its own title, else its app's name, else a generic label for items
+/// that the system's menu bar host publishes on behalf of other processes.
+fn display_name(item: &MenuBarItem, app_name: Option<String>, system_label: &str) -> String {
+    const HOSTS: [&str; 3] = ["MenuBarAgent", "SystemUIServer", "ControlCenter"];
+    if !item.title.is_empty() {
+        return item.title.clone();
+    }
+    match app_name {
+        Some(name) if !HOSTS.contains(&name.as_str()) => name,
+        _ => system_label.to_owned(),
     }
 }
 
@@ -209,5 +239,43 @@ fn action_button(
             Some(action),
             mtm,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn item(title: &str) -> MenuBarItem {
+        MenuBarItem {
+            title: title.into(),
+            owner: "com.example.app".into(),
+            ..MenuBarItem::default()
+        }
+    }
+
+    #[test]
+    fn prefers_the_items_own_title() {
+        assert_eq!(
+            display_name(&item("Wi-Fi"), Some("Control".into()), "System"),
+            "Wi-Fi"
+        );
+    }
+
+    #[test]
+    fn falls_back_to_the_app_name() {
+        assert_eq!(
+            display_name(&item(""), Some("Shottr".into()), "System"),
+            "Shottr"
+        );
+    }
+
+    #[test]
+    fn labels_items_hosted_by_the_system() {
+        assert_eq!(
+            display_name(&item(""), Some("MenuBarAgent".into()), "System"),
+            "System"
+        );
+        assert_eq!(display_name(&item(""), None, "System"), "System");
     }
 }

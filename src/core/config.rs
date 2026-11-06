@@ -68,6 +68,9 @@ impl Default for Shortcut {
 pub struct AutoHide {
     pub enabled: bool,
     pub delay_secs: u32,
+    /// Hide the icons right after Pinscher starts (and after every login), instead of waiting
+    /// for the first click.
+    pub hide_on_launch: bool,
 }
 
 impl Default for AutoHide {
@@ -75,6 +78,7 @@ impl Default for AutoHide {
         Self {
             enabled: true,
             delay_secs: DEFAULT_AUTO_HIDE_DELAY,
+            hide_on_launch: true,
         }
     }
 }
@@ -297,6 +301,7 @@ mod tests {
             auto_hide: AutoHide {
                 enabled: false,
                 delay_secs: 12,
+                hide_on_launch: false,
             },
             advanced: Advanced {
                 secondary_bar: true,
@@ -333,6 +338,16 @@ mod tests {
         assert_eq!(loaded.config.auto_hide.delay_secs, DEFAULT_AUTO_HIDE_DELAY);
         assert_eq!(loaded.config.shortcut.toggle, DEFAULT_SHORTCUT);
         assert_eq!(loaded.warnings, []);
+    }
+
+    #[test]
+    fn configs_saved_before_hide_on_launch_existed_hide_on_launch() {
+        let dir = TempDir::new().unwrap();
+        let path = config_in(&dir);
+        write(&path, b"[auto_hide]\nenabled = true\ndelay_secs = 7\n");
+        let loaded = load(&path);
+        assert!(loaded.config.auto_hide.hide_on_launch);
+        assert_eq!(loaded.config.auto_hide.delay_secs, 7);
     }
 
     #[test]

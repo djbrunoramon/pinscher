@@ -66,6 +66,23 @@ pub enum Action {
     None,
 }
 
+/// Wait before the first collapse after launch, so macOS has placed the status items.
+pub const STARTUP_COLLAPSE_DELAY: Duration = Duration::from_millis(1500);
+/// Wait between collapse attempts while the status items are still settling.
+const STARTUP_RETRY_DELAY: Duration = Duration::from_secs(1);
+/// Collapse attempts after which Pinscher stops trying on its own (about 20 s in all).
+const STARTUP_MAX_ATTEMPTS: u8 = 20;
+
+/// When to try the launch-time collapse again after it was `blocked`, or `None` to give up.
+///
+/// Right after login macOS may not have placed the status items yet, so positions are unknown
+/// or briefly out of order. Trying again a moment later is safe: the collapse still goes through
+/// the same order check, so it can never hide the Pinscher icon.
+#[must_use]
+pub fn startup_retry(attempt: u8) -> Option<Duration> {
+    (attempt < STARTUP_MAX_ATTEMPTS).then_some(STARTUP_RETRY_DELAY)
+}
+
 /// How the always-hidden divider should be drawn.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Divider {
@@ -119,6 +136,15 @@ impl Bar {
     /// Configures the one-shot delay used after a user expansion.
     pub fn set_auto_hide(&mut self, auto_hide: Option<Duration>) {
         self.auto_hide = auto_hide;
+    }
+
+    /// The timer request for the collapse that hides the icons right after launch.
+    #[must_use]
+    pub fn startup_collapse(&self, after: Duration) -> CollapseTimer {
+        CollapseTimer {
+            generation: self.generation,
+            after,
+        }
     }
 
     /// Returns the timer request for the current user expansion, if any.
@@ -516,5 +542,55 @@ mod tests {
             bar.finish_temporary_reveal(Visibility::Collapsed, Some(ORDERED)),
             Action::Apply(Visibility::Collapsed)
         );
+    }
+
+    #[test]
+    fn startup_collapse_targets_the_current_generation_and_collapses() {
+        let mut bar = Bar::new();
+        let request = bar.startup_collapse(STARTUP_COLLAPSE_DELAY);
+        assert_eq!(request.after, STARTUP_COLLAPSE_DELAY);
+        assert_eq!(
+            bar.on_timer(request.generation, Some(ORDERED)),
+            Action::Apply(Visibility::Collapsed)
+        );
+    }
+
+    #[test]
+    fn startup_collapse_is_dropped_when_the_user_acts_first() {
+        let mut bar = Bar::new();
+        let request = bar.startup_collapse(STARTUP_COLLAPSE_DELAY);
+        bar.collapse(Some(ORDERED));
+        bar.expand();
+        assert_eq!(
+            bar.on_timer(request.generation, Some(ORDERED)),
+            Action::None
+        );
+        assert_eq!(bar.visibility(), Visibility::Expanded);
+    }
+
+    #[test]
+    fn startup_collapse_never_hides_the_icon_even_when_unsettled() {
+        let mut bar = Bar::new();
+        let request = bar.startup_collapse(STARTUP_COLLAPSE_DELAY);
+        let swapped = Layout {
+            icon_x: 100.0,
+            separator_x: 900.0,
+        };
+        assert_eq!(
+            bar.on_timer(request.generation, Some(swapped)),
+            Action::Blocked(Blocked::SeparatorRightOfIcon)
+        );
+        assert_eq!(
+            bar.on_timer(request.generation, None),
+            Action::Blocked(Blocked::LayoutUnknown)
+        );
+        assert_eq!(bar.visibility(), Visibility::Expanded);
+    }
+
+    #[test]
+    fn startup_retries_for_a_while_then_gives_up() {
+        assert_eq!(startup_retry(0), Some(Duration::from_secs(1)));
+        assert_eq!(startup_retry(19), Some(Duration::from_secs(1)));
+        assert_eq!(startup_retry(20), None);
     }
 }
