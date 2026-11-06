@@ -130,6 +130,25 @@ impl Bar {
         Action::Apply(Visibility::Expanded)
     }
 
+    /// Ends an explicit temporary reveal, restoring the previous visibility when safe.
+    pub fn finish_temporary_reveal(
+        &mut self,
+        previous: Visibility,
+        layout: Option<Layout>,
+    ) -> Action {
+        self.revealing_all = false;
+        self.generation = self.generation.wrapping_add(1);
+        if previous == Visibility::Collapsed {
+            match self.collapse(layout) {
+                Action::Blocked(_) => Action::Apply(self.visibility),
+                action => action,
+            }
+        } else {
+            self.visibility = Visibility::Expanded;
+            Action::Apply(Visibility::Expanded)
+        }
+    }
+
     /// Whether the always-hidden section is currently revealed.
     #[must_use]
     pub fn revealing_all(&self) -> bool {
@@ -432,5 +451,25 @@ mod tests {
                 Divider::Thin
             );
         }
+    }
+    #[test]
+    fn temporary_reveal_restores_always_hidden_even_without_auto_hide() {
+        let mut bar = Bar::new();
+        bar.set_auto_hide(None);
+        bar.reveal_all();
+        assert_eq!(
+            bar.finish_temporary_reveal(Visibility::Expanded, Some(ORDERED)),
+            Action::Apply(Visibility::Expanded)
+        );
+        assert!(!bar.revealing_all());
+        assert_eq!(
+            bar.always_hidden_divider(Some(ORDERED), 900.0),
+            Divider::Collapsed
+        );
+        bar.reveal_all();
+        assert_eq!(
+            bar.finish_temporary_reveal(Visibility::Collapsed, Some(ORDERED)),
+            Action::Apply(Visibility::Collapsed)
+        );
     }
 }

@@ -134,6 +134,8 @@ pub enum SaveError {
     Io(io::ErrorKind),
     #[error("could not serialize config")]
     Serialize,
+    #[error("configuration exceeds the file size limit")]
+    TooLarge,
 }
 
 impl From<io::Error> for SaveError {
@@ -173,6 +175,9 @@ pub fn load(path: &Path) -> Loaded {
 /// Returns [`SaveError`] when the directory or file cannot be written.
 pub fn save(path: &Path, config: &Config) -> Result<(), SaveError> {
     let text = toml::to_string_pretty(config).map_err(|_| SaveError::Serialize)?;
+    if u64::try_from(text.len()).unwrap_or(u64::MAX) > MAX_FILE_BYTES {
+        return Err(SaveError::TooLarge);
+    }
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }
@@ -459,5 +464,16 @@ mod tests {
         let shown = error.to_string();
         assert!(!shown.contains("secret-user-folder"), "{shown}");
         assert!(!shown.contains('/'), "{shown}");
+    }
+    #[test]
+    fn oversized_save_preserves_existing_preferences() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        save(&path, &Config::default()).unwrap();
+        let before = fs::read(&path).unwrap();
+        let mut config = Config::default();
+        config.shortcut.toggle = "x".repeat(usize::try_from(MAX_FILE_BYTES).unwrap());
+        assert!(matches!(save(&path, &config), Err(SaveError::TooLarge)));
+        assert_eq!(fs::read(&path).unwrap(), before);
     }
 }

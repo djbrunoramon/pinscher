@@ -8,7 +8,7 @@
 //! [always hidden ...] |always-hidden divider| [hidden ...] |separator| [visible ...] (Pinscher)
 //! ```
 
-use crate::core::config::{SavedItem, Section};
+use crate::core::config::{Config, MAX_FILE_BYTES, MAX_ITEMS, MAX_TEXT_LEN, SavedItem, Section};
 
 /// A rectangle in global screen points (origin top-left, as Accessibility reports it).
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
@@ -112,6 +112,50 @@ pub fn group(items: Vec<MenuBarItem>, dividers: Dividers) -> Sections {
         }
     }
     sections
+}
+
+/// Resolves a snapshot identity only when exactly one live item still matches it.
+#[must_use]
+pub fn unique_item<'a>(
+    items: &'a [MenuBarItem],
+    expected: &MenuBarItem,
+) -> Option<&'a MenuBarItem> {
+    let mut matches = items.iter().filter(|item| {
+        item.owner_pid == expected.owner_pid
+            && item.owner == expected.owner
+            && item.title == expected.title
+    });
+    let item = matches.next()?;
+    matches.next().is_none().then_some(item)
+}
+
+/// Remembers a verified move only if it fits the same bounds used when loading preferences.
+/// A rejected update leaves all existing choices intact.
+pub fn remember_section(config: &mut Config, item: &MenuBarItem, section: Section) -> bool {
+    if item.owner.is_empty()
+        || item.owner.chars().count() > MAX_TEXT_LEN
+        || item.title.chars().count() > MAX_TEXT_LEN
+    {
+        return false;
+    }
+    let mut next = config.clone();
+    next.items
+        .retain(|entry| entry.owner != item.owner || entry.title != item.title);
+    if next.items.len() >= MAX_ITEMS {
+        return false;
+    }
+    next.items.push(SavedItem {
+        owner: item.owner.clone(),
+        title: item.title.clone(),
+        section,
+    });
+    if !toml::to_string_pretty(&next)
+        .is_ok_and(|text| u64::try_from(text.len()).unwrap_or(u64::MAX) <= MAX_FILE_BYTES)
+    {
+        return false;
+    }
+    *config = next;
+    true
 }
 
 /// The section the user saved for `item`, matched by owner and title.
@@ -240,5 +284,39 @@ mod tests {
         assert_eq!(rect.center(), (20.0, 12.0));
         assert!(rect.contains(10.0, 24.0));
         assert!(!rect.contains(31.0, 5.0));
+    }
+    #[test]
+    fn refuses_ambiguous_or_restarted_item_identity() {
+        let expected = menu_bar_items(vec![item(7, "app", 10.0)], OWN_PID).remove(0);
+        assert!(unique_item(&[expected.clone(), expected.clone()], &expected).is_none());
+        let mut restarted = expected.clone();
+        restarted.owner_pid += 1;
+        assert!(unique_item(&[restarted], &expected).is_none());
+        let mut moved = expected.clone();
+        moved.frame.x += 100.0;
+        assert_eq!(
+            unique_item(std::slice::from_ref(&moved), &expected),
+            Some(&moved)
+        );
+    }
+    #[test]
+    fn remembers_verified_section_without_losing_other_choices() {
+        let mut config = Config::default();
+        let item = menu_bar_items(vec![item(7, "app", 10.0)], OWN_PID).remove(0);
+        assert!(remember_section(&mut config, &item, Section::Hidden));
+        assert!(remember_section(&mut config, &item, Section::Visible));
+        assert_eq!(config.items.len(), 1);
+        assert_eq!(saved_section(&item, &config.items), Some(Section::Visible));
+        let before = config.clone();
+        let oversized = MenuBarItem {
+            title: "x".repeat(MAX_TEXT_LEN + 1),
+            ..item
+        };
+        assert!(!remember_section(
+            &mut config,
+            &oversized,
+            Section::AlwaysHidden
+        ));
+        assert_eq!(config, before);
     }
 }

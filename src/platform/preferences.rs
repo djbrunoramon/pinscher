@@ -6,11 +6,12 @@
 use crate::core::l10n::{Lang, Text, text};
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, ProtocolObject, Sel};
-use objc2::{MainThreadMarker, MainThreadOnly};
+use objc2::{AnyThread, MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
     NSApplication, NSBackingStoreType, NSButton, NSColor, NSControlStateValueOff,
-    NSControlStateValueOn, NSFont, NSLayoutAttribute, NSStackView, NSStepper, NSTextField,
-    NSUserInterfaceLayoutOrientation, NSView, NSWindow, NSWindowDelegate, NSWindowStyleMask,
+    NSControlStateValueOn, NSFont, NSLayoutAttribute, NSStackView, NSStepper, NSTabView,
+    NSTabViewItem, NSTextField, NSUserInterfaceLayoutOrientation, NSView, NSWindow,
+    NSWindowDelegate, NSWindowStyleMask,
 };
 use objc2_foundation::{NSArray, NSEdgeInsets, NSPoint, NSRect, NSSize, NSString};
 
@@ -30,6 +31,7 @@ pub struct SettingsState {
     pub always_hidden: bool,
     pub secondary_bar: bool,
     pub accessibility_missing: bool,
+    pub screen_capture_missing: bool,
 }
 
 /// Selectors the controls send to the target.
@@ -43,6 +45,9 @@ pub struct SettingsActions {
     pub always_hidden: Sel,
     pub secondary_bar: Sel,
     pub open_accessibility: Sel,
+    pub open_screen_capture: Sel,
+    pub refresh_layout: Sel,
+    pub restore_layout: Sel,
 }
 
 /// The Settings window and the controls whose state changes.
@@ -62,6 +67,9 @@ pub struct SettingsWindow {
     secondary_bar: Retained<NSButton>,
     accessibility_note: Retained<NSTextField>,
     open_accessibility: Retained<NSButton>,
+    screen_capture_note: Retained<NSTextField>,
+    open_screen_capture: Retained<NSButton>,
+    pub layout: super::layout_view::LayoutView,
 }
 
 /// Bounds of the auto-hide delay stepper, matching `core::config::AUTO_HIDE_DELAY_RANGE`.
@@ -155,6 +163,13 @@ impl SettingsWindow {
             actions.open_accessibility,
         );
 
+        let screen_capture_note = note(mtm, t(Text::SettingsScreenCaptureMissing));
+        let open_screen_capture = button(
+            mtm,
+            t(Text::SettingsOpenScreenCapture),
+            target,
+            actions.open_screen_capture,
+        );
         let content = column(
             mtm,
             &[
@@ -169,11 +184,34 @@ impl SettingsWindow {
                 &secondary_bar,
                 &accessibility_note,
                 &open_accessibility,
+                &screen_capture_note,
+                &open_screen_capture,
             ],
         );
 
         let window = window(mtm, t(Text::SettingsTitle));
-        window.setContentView(Some(&content));
+        let tabs = NSTabView::initWithFrame(
+            NSTabView::alloc(mtm),
+            NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(680.0, 500.0)),
+        );
+        let layout = super::layout_view::LayoutView::new(
+            mtm,
+            lang,
+            target,
+            actions.refresh_layout,
+            actions.restore_layout,
+        );
+        for (key, view) in [
+            (Text::SettingsGeneral, &*content as &NSView),
+            (Text::SettingsLayout, &*layout.view),
+        ] {
+            // SAFETY: no external identifier is needed; AppKit retains the view and tab item.
+            let tab = unsafe { NSTabViewItem::initWithIdentifier(NSTabViewItem::alloc(), None) };
+            tab.setLabel(&NSString::from_str(t(key)));
+            tab.setView(Some(view));
+            tabs.addTabViewItem(&tab);
+        }
+        window.setContentView(Some(&tabs));
         window.setDelegate(Some(delegate));
 
         Self {
@@ -191,6 +229,9 @@ impl SettingsWindow {
             secondary_bar,
             accessibility_note,
             open_accessibility,
+            screen_capture_note,
+            open_screen_capture,
+            layout,
         }
     }
 
@@ -249,6 +290,10 @@ impl SettingsWindow {
             .setHidden(!state.accessibility_missing);
         self.open_accessibility
             .setHidden(!state.accessibility_missing);
+        self.screen_capture_note
+            .setHidden(!state.screen_capture_missing);
+        self.open_screen_capture
+            .setHidden(!state.screen_capture_missing);
     }
 }
 
@@ -259,7 +304,7 @@ pub fn is_on(sender: &NSButton) -> bool {
 }
 
 fn window(mtm: MainThreadMarker, title: &str) -> Retained<NSWindow> {
-    let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(520.0, 320.0));
+    let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(680.0, 500.0));
     // SAFETY: standard designated initializer with a valid frame and style; the window is kept
     // alive by `SettingsWindow` and is not released on close (set right below).
     let window = unsafe {

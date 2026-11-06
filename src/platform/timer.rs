@@ -40,6 +40,22 @@ impl Timer {
         self.timer = Some(timer);
     }
 
+    /// Schedules a main-thread action with no payload, replacing the previous timer.
+    pub fn schedule_action(&mut self, after: Duration, target: &AnyObject, action: Sel) {
+        self.cancel();
+        // SAFETY: target is the retained app delegate, action accepts the NSTimer sender, and
+        // this non-repeating timer runs on the main run loop with a finite positive delay.
+        self.timer = Some(unsafe {
+            NSTimer::scheduledTimerWithTimeInterval_target_selector_userInfo_repeats(
+                after.as_secs_f64(),
+                target,
+                action,
+                None,
+                false,
+            )
+        });
+    }
+
     /// Observes status item reordering on the main run loop while a divider is enabled.
     pub fn observe_layout(&mut self, target: &AnyObject, action: Sel) {
         self.cancel();

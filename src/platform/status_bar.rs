@@ -8,8 +8,8 @@ use objc2::MainThreadMarker;
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, Sel};
 use objc2_app_kit::{
-    NSCellImagePosition, NSEventMask, NSImage, NSStatusBar, NSStatusBarButton, NSStatusItem,
-    NSVariableStatusItemLength,
+    NSCellImagePosition, NSEventMask, NSImage, NSScreen, NSStatusBar, NSStatusBarButton,
+    NSStatusItem, NSVariableStatusItemLength,
 };
 use objc2_foundation::NSString;
 use std::cell::RefCell;
@@ -18,7 +18,7 @@ use std::cell::RefCell;
 const COLLAPSED_LENGTH: f64 = 10_000.0;
 
 /// The status items Pinscher owns.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StatusBar {
     icon: Retained<NSStatusItem>,
     separator: Retained<NSStatusItem>,
@@ -138,6 +138,49 @@ impl StatusBar {
                 NSCellImagePosition::ImageOnly
             });
         }
+    }
+
+    /// Menu bar and owned item frames in AX's top-left global coordinate space.
+    #[must_use]
+    pub fn geometry(
+        &self,
+        mtm: MainThreadMarker,
+    ) -> Option<(
+        crate::core::layout::Rect,
+        crate::core::layout::Rect,
+        crate::core::drag::DividerFrames,
+    )> {
+        let window = self.icon.button(mtm)?.window()?;
+        let screen = window.screen()?;
+        let primary_top = NSScreen::screens(mtm).firstObject()?.frame().max().y;
+        let convert = |r: objc2_foundation::NSRect| crate::core::layout::Rect {
+            x: r.origin.x,
+            y: primary_top - r.max().y,
+            width: r.size.width,
+            height: r.size.height,
+        };
+        let icon = convert(window.frame());
+        let screen_frame = screen.frame();
+        let bounds = crate::core::layout::Rect {
+            x: screen_frame.origin.x,
+            y: primary_top - screen_frame.max().y,
+            width: screen_frame.size.width,
+            height: icon.height,
+        };
+        let separator = convert(self.separator.button(mtm)?.window()?.frame());
+        let always_hidden = self.always_hidden.borrow().as_ref().and_then(|item| {
+            item.button(mtm)?
+                .window()
+                .map(|window| convert(window.frame()))
+        });
+        Some((
+            bounds,
+            icon,
+            crate::core::drag::DividerFrames {
+                separator,
+                always_hidden,
+            },
+        ))
     }
 
     /// The icon's button, used to anchor menus and panels.

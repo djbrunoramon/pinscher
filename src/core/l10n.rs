@@ -37,6 +37,24 @@ pub enum Text {
     SeparatorAccessibility,
     AlwaysHiddenAccessibility,
     MenuRevealAll,
+    SettingsLayout,
+    LayoutRefresh,
+    LayoutRestore,
+    LayoutInstructions,
+    LayoutEmpty,
+    LayoutBusy,
+    LayoutMoveFailed,
+    LayoutSaveFailed,
+    LayoutRestored,
+    SectionVisible,
+    SectionHidden,
+    SectionAlwaysHidden,
+    SecondaryEmpty,
+    SettingsScreenCaptureMissing,
+    SettingsOpenScreenCapture,
+    SecondaryUnavailable,
+    SecondaryItemUnavailable,
+
     MenuPreferences,
     MenuAbout,
     MenuQuit,
@@ -72,6 +90,30 @@ pub fn text(lang: Lang, text: Text) -> &'static str {
 
 fn en(text: Text) -> &'static str {
     match text {
+        Text::SettingsLayout => "Layout",
+        Text::LayoutRefresh => "Refresh and Arrange…",
+        Text::LayoutRestore => "Restore Saved Layout",
+        Text::LayoutInstructions => {
+            "Refresh to reveal icons and arrange them. Close Settings to hide them again."
+        }
+        Text::LayoutEmpty => "No items found. Allow Accessibility and refresh.",
+        Text::LayoutBusy => "Moving an icon…",
+        Text::LayoutMoveFailed => "The icon could not be moved. Refresh and try again.",
+        Text::LayoutSaveFailed => "The icon moved, but its layout could not be saved.",
+        Text::LayoutRestored => "Saved layout restored where possible. Missing items were skipped.",
+        Text::SectionVisible => "Visible",
+        Text::SectionHidden => "Hidden",
+        Text::SectionAlwaysHidden => "Always Hidden",
+        Text::SecondaryEmpty => "No hidden icons. Hold ⌘ and drag icons left of a separator.",
+        Text::SettingsScreenCaptureMissing => "Allow Screen Recording to capture menu bar icons.",
+        Text::SettingsOpenScreenCapture => "Open Screen Recording Settings",
+        Text::SecondaryUnavailable => {
+            "Enable the secondary bar in Settings and allow Accessibility and Screen Recording."
+        }
+        Text::SecondaryItemUnavailable => {
+            "This icon is unavailable or has no room on screen. Try showing the icons first."
+        }
+
         Text::IconAccessibility => "Pinscher",
         Text::IconTooltip => "Click to show or hide icons. Right-click for options.",
         Text::SeparatorAccessibility => "Pinscher separator",
@@ -114,6 +156,36 @@ fn en(text: Text) -> &'static str {
 
 fn pt_br(text: Text) -> &'static str {
     match text {
+        Text::SettingsLayout => "Layout",
+        Text::LayoutRefresh => "Atualizar e organizar…",
+        Text::LayoutRestore => "Restaurar organização salva",
+        Text::LayoutInstructions => {
+            "Atualize para revelar os ícones e organizar. Feche os Ajustes para ocultá-los de novo."
+        }
+        Text::LayoutEmpty => "Nenhum item encontrado. Permita Acessibilidade e atualize.",
+        Text::LayoutBusy => "Movendo um ícone…",
+        Text::LayoutMoveFailed => "Não foi possível mover o ícone. Atualize e tente de novo.",
+        Text::LayoutSaveFailed => "O ícone foi movido, mas não foi possível salvar a organização.",
+        Text::LayoutRestored => {
+            "Organização salva restaurada onde possível. Itens ausentes foram ignorados."
+        }
+        Text::SectionVisible => "Visível",
+        Text::SectionHidden => "Oculto",
+        Text::SectionAlwaysHidden => "Sempre oculto",
+        Text::SecondaryEmpty => {
+            "Nenhum ícone oculto. Segure ⌘ e arraste ícones à esquerda de um separador."
+        }
+        Text::SettingsScreenCaptureMissing => {
+            "Permita Gravação de Tela para capturar ícones da barra de menus."
+        }
+        Text::SettingsOpenScreenCapture => "Abrir ajustes de Gravação de Tela",
+        Text::SecondaryUnavailable => {
+            "Ative a segunda barra nos Ajustes e permita Acessibilidade e Gravação de Tela."
+        }
+        Text::SecondaryItemUnavailable => {
+            "Este ícone está indisponível ou não cabe na tela. Tente mostrar os ícones primeiro."
+        }
+
         Text::IconAccessibility => "Pinscher",
         Text::IconTooltip => {
             "Clique para mostrar ou ocultar ícones. Clique com o botão direito para opções."

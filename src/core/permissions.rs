@@ -10,19 +10,21 @@ use crate::core::config::Advanced;
 pub enum Permission {
     /// Discover, press and move other apps' status items.
     Accessibility,
+    ScreenCapture,
 }
 
 /// What the system has granted.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Granted {
     pub accessibility: bool,
+    pub screen_capture: bool,
 }
 
 /// Permissions needed by the enabled advanced features, in the order to ask for them.
 #[must_use]
 pub fn required(advanced: &Advanced) -> Vec<Permission> {
     if advanced.secondary_bar {
-        vec![Permission::Accessibility]
+        vec![Permission::Accessibility, Permission::ScreenCapture]
     } else {
         Vec::new()
     }
@@ -42,6 +44,7 @@ pub fn missing(needed: &[Permission], granted: Granted) -> Vec<Permission> {
         .copied()
         .filter(|permission| match permission {
             Permission::Accessibility => !granted.accessibility,
+            Permission::ScreenCapture => !granted.screen_capture,
         })
         .collect()
 }
@@ -65,12 +68,15 @@ mod tests {
     }
 
     #[test]
-    fn secondary_bar_needs_accessibility() {
+    fn secondary_bar_needs_both_permissions() {
         let advanced = Advanced {
             secondary_bar: true,
             ..Advanced::default()
         };
-        assert_eq!(required(&advanced), [Permission::Accessibility]);
+        assert_eq!(
+            required(&advanced),
+            [Permission::Accessibility, Permission::ScreenCapture]
+        );
     }
 
     #[test]
@@ -79,13 +85,15 @@ mod tests {
         assert_eq!(needed, [Permission::Accessibility]);
         let granted = Granted {
             accessibility: false,
+            screen_capture: false,
         };
         assert_eq!(missing(&needed, granted), [Permission::Accessibility]);
         assert_eq!(
             missing(
                 &needed,
                 Granted {
-                    accessibility: true
+                    accessibility: true,
+                    screen_capture: false
                 }
             ),
             []
