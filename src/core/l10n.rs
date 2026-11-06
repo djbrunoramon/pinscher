@@ -43,6 +43,20 @@ pub enum Text {
     WarningShortcutUnavailable,
     LoginRequiresApproval,
     LoginUnavailable,
+    SettingsTitle,
+    SettingsGeneral,
+    SettingsShortcut,
+    SettingsShortcutRecord,
+    SettingsShortcutRecording,
+    SettingsShortcutClear,
+    SettingsShortcutNone,
+    SettingsAutoHide,
+    SettingsAutoHideSeconds,
+    SettingsAdvanced,
+    SettingsAlwaysHidden,
+    SettingsSecondaryBar,
+    SettingsAccessibilityMissing,
+    SettingsOpenSystemSettings,
 }
 
 /// Returns the translation of `text` in `lang`.
@@ -59,7 +73,7 @@ fn en(text: Text) -> &'static str {
         Text::IconAccessibility => "Pinscher",
         Text::IconTooltip => "Click to show or hide icons. Right-click for options.",
         Text::SeparatorAccessibility => "Pinscher separator",
-        Text::MenuPreferences => "Preferences…",
+        Text::MenuPreferences => "Settings…",
         Text::MenuAbout => "About Pinscher",
         Text::MenuQuit => "Quit Pinscher",
         Text::MenuLaunchAtLogin => "Launch at Login",
@@ -67,12 +81,30 @@ fn en(text: Text) -> &'static str {
             "Icons can't be hidden: the separator must be to the left of the Pinscher icon. Hold ⌘ and drag to reorder."
         }
         Text::WarningShortcutUnavailable => {
-            "The keyboard shortcut is unavailable. Choose another one in Preferences."
+            "The keyboard shortcut is unavailable. Choose another one in Settings."
         }
         Text::LoginRequiresApproval => "Allow Pinscher in System Settings › General › Login Items.",
         Text::LoginUnavailable => {
             "Launch at login only works when Pinscher runs from its app bundle."
         }
+        Text::SettingsTitle => "Pinscher Settings",
+        Text::SettingsGeneral => "General",
+        Text::SettingsShortcut => "Show or hide icons:",
+        Text::SettingsShortcutRecord => "Record Shortcut",
+        Text::SettingsShortcutRecording => "Press a shortcut… (Esc to cancel)",
+        Text::SettingsShortcutClear => "Clear",
+        Text::SettingsShortcutNone => "None",
+        Text::SettingsAutoHide => "Hide icons again automatically after",
+        Text::SettingsAutoHideSeconds => "seconds",
+        Text::SettingsAdvanced => "Advanced",
+        Text::SettingsAlwaysHidden => "Add an always-hidden section (second separator)",
+        Text::SettingsSecondaryBar => {
+            "Show hidden icons in a bar below the menu bar (⌥-click the icon)"
+        }
+        Text::SettingsAccessibilityMissing => {
+            "Pinscher needs Accessibility permission for this feature."
+        }
+        Text::SettingsOpenSystemSettings => "Open System Settings",
     }
 }
 
@@ -83,7 +115,7 @@ fn pt_br(text: Text) -> &'static str {
             "Clique para mostrar ou ocultar ícones. Clique com o botão direito para opções."
         }
         Text::SeparatorAccessibility => "Separador do Pinscher",
-        Text::MenuPreferences => "Preferências…",
+        Text::MenuPreferences => "Ajustes…",
         Text::MenuAbout => "Sobre o Pinscher",
         Text::MenuQuit => "Encerrar o Pinscher",
         Text::MenuLaunchAtLogin => "Iniciar com o login",
@@ -91,7 +123,7 @@ fn pt_br(text: Text) -> &'static str {
             "Não dá para ocultar ícones: o separador precisa ficar à esquerda do ícone do Pinscher. Segure ⌘ e arraste para reordenar."
         }
         Text::WarningShortcutUnavailable => {
-            "O atalho de teclado não está disponível. Escolha outro nas Preferências."
+            "O atalho de teclado não está disponível. Escolha outro nos Ajustes."
         }
         Text::LoginRequiresApproval => {
             "Permita o Pinscher em Ajustes do Sistema › Geral › Itens de Início."
@@ -99,6 +131,24 @@ fn pt_br(text: Text) -> &'static str {
         Text::LoginUnavailable => {
             "Iniciar com o login só funciona quando o Pinscher roda a partir do app."
         }
+        Text::SettingsTitle => "Ajustes do Pinscher",
+        Text::SettingsGeneral => "Geral",
+        Text::SettingsShortcut => "Mostrar ou ocultar ícones:",
+        Text::SettingsShortcutRecord => "Gravar atalho",
+        Text::SettingsShortcutRecording => "Pressione um atalho… (Esc cancela)",
+        Text::SettingsShortcutClear => "Limpar",
+        Text::SettingsShortcutNone => "Nenhum",
+        Text::SettingsAutoHide => "Ocultar ícones de novo automaticamente após",
+        Text::SettingsAutoHideSeconds => "segundos",
+        Text::SettingsAdvanced => "Avançado",
+        Text::SettingsAlwaysHidden => "Adicionar seção sempre oculta (segundo separador)",
+        Text::SettingsSecondaryBar => {
+            "Mostrar ícones ocultos numa barra abaixo da barra de menus (⌥ + clique no ícone)"
+        }
+        Text::SettingsAccessibilityMissing => {
+            "O Pinscher precisa da permissão de Acessibilidade para este recurso."
+        }
+        Text::SettingsOpenSystemSettings => "Abrir Ajustes do Sistema",
     }
 }
 

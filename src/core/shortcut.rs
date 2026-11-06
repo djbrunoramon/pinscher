@@ -70,6 +70,121 @@ pub fn parse(value: &str) -> Result<Shortcut, ShortcutError> {
     })
 }
 
+/// Modifier keys held during a key press, as reported by the platform.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct Modifiers {
+    pub ctrl: bool,
+    pub alt: bool,
+    pub shift: bool,
+    pub cmd: bool,
+}
+
+/// Builds a shortcut from a recorded key press (macOS virtual key code).
+///
+/// # Errors
+///
+/// Returns [`ShortcutError::Invalid`] for unsupported keys or when no ⌃, ⌥ or ⌘ is held.
+pub fn from_key_press(modifiers: Modifiers, key_code: u16) -> Result<Shortcut, ShortcutError> {
+    let key = key_for_code(key_code).ok_or(ShortcutError::Invalid)?;
+    let mut bits = 0;
+    for (held, bit) in [
+        (modifiers.ctrl, CTRL),
+        (modifiers.alt, ALT),
+        (modifiers.shift, SHIFT),
+        (modifiers.cmd, CMD),
+    ] {
+        if held {
+            bits |= bit;
+        }
+    }
+    if bits & (CTRL | ALT | CMD) == 0 {
+        return Err(ShortcutError::Invalid);
+    }
+    Ok(Shortcut {
+        modifiers: bits,
+        key,
+    })
+}
+
+/// ANSI virtual key codes (`kVK_*` in Carbon's `Events.h`) for the supported keys.
+fn key_for_code(code: u16) -> Option<Key> {
+    const LETTERS: [(u16, char); 26] = [
+        (0, 'A'),
+        (11, 'B'),
+        (8, 'C'),
+        (2, 'D'),
+        (14, 'E'),
+        (3, 'F'),
+        (5, 'G'),
+        (4, 'H'),
+        (34, 'I'),
+        (38, 'J'),
+        (40, 'K'),
+        (37, 'L'),
+        (46, 'M'),
+        (45, 'N'),
+        (31, 'O'),
+        (35, 'P'),
+        (12, 'Q'),
+        (15, 'R'),
+        (1, 'S'),
+        (17, 'T'),
+        (32, 'U'),
+        (9, 'V'),
+        (13, 'W'),
+        (7, 'X'),
+        (16, 'Y'),
+        (6, 'Z'),
+    ];
+    const DIGITS: [(u16, char); 10] = [
+        (29, '0'),
+        (18, '1'),
+        (19, '2'),
+        (20, '3'),
+        (21, '4'),
+        (23, '5'),
+        (22, '6'),
+        (26, '7'),
+        (28, '8'),
+        (25, '9'),
+    ];
+    const FUNCTIONS: [(u16, u8); 12] = [
+        (122, 1),
+        (120, 2),
+        (99, 3),
+        (118, 4),
+        (96, 5),
+        (97, 6),
+        (98, 7),
+        (100, 8),
+        (101, 9),
+        (109, 10),
+        (103, 11),
+        (111, 12),
+    ];
+    const SPACE: u16 = 49;
+    if code == SPACE {
+        return Some(Key::Space);
+    }
+    LETTERS
+        .iter()
+        .find(|(c, _)| *c == code)
+        .map(|(_, l)| Key::Letter(*l))
+        .or_else(|| {
+            DIGITS
+                .iter()
+                .find(|(c, _)| *c == code)
+                .map(|(_, d)| Key::Digit(*d))
+        })
+        .or_else(|| {
+            FUNCTIONS
+                .iter()
+                .find(|(c, _)| *c == code)
+                .map(|(_, n)| Key::Function(*n))
+        })
+}
+
 impl Shortcut {
     /// Converts the shortcut to the normalized `global-hotkey` config format.
     #[must_use]
@@ -213,6 +328,62 @@ mod tests {
     #[test]
     fn rejects_empty() {
         assert_eq!(parse(""), Err(ShortcutError::Invalid));
+    }
+
+    #[test]
+    fn records_key_press() {
+        let modifiers = Modifiers {
+            alt: true,
+            cmd: true,
+            ..Modifiers::default()
+        };
+        assert_eq!(from_key_press(modifiers, 35), parse("alt+cmd+KeyP"));
+        let ctrl = Modifiers {
+            ctrl: true,
+            ..Modifiers::default()
+        };
+        assert_eq!(from_key_press(ctrl, 49), parse("ctrl+Space"));
+        assert_eq!(from_key_press(ctrl, 111), parse("ctrl+F12"));
+        assert_eq!(from_key_press(ctrl, 29), parse("ctrl+Digit0"));
+    }
+
+    #[test]
+    fn rejects_recorded_press_without_command_modifier() {
+        let shift = Modifiers {
+            shift: true,
+            ..Modifiers::default()
+        };
+        assert_eq!(from_key_press(shift, 35), Err(ShortcutError::Invalid));
+        assert_eq!(
+            from_key_press(Modifiers::default(), 35),
+            Err(ShortcutError::Invalid)
+        );
+    }
+
+    #[test]
+    fn rejects_unsupported_key_code() {
+        let cmd = Modifiers {
+            cmd: true,
+            ..Modifiers::default()
+        };
+        // 53 is Escape, 36 is Return.
+        assert_eq!(from_key_press(cmd, 53), Err(ShortcutError::Invalid));
+        assert_eq!(from_key_press(cmd, 36), Err(ShortcutError::Invalid));
+    }
+
+    #[test]
+    fn every_letter_code_is_unique() {
+        let cmd = Modifiers {
+            cmd: true,
+            ..Modifiers::default()
+        };
+        let mut seen = std::collections::HashSet::new();
+        for code in 0..128 {
+            if let Ok(shortcut) = from_key_press(cmd, code) {
+                assert!(seen.insert(shortcut.to_config_string()), "{code}");
+            }
+        }
+        assert_eq!(seen.len(), 26 + 10 + 12 + 1);
     }
 
     #[test]
