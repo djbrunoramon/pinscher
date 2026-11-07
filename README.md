@@ -2,7 +2,23 @@
 
 # Pinscher
 
+<p align="center"><img src="docs/images/icon.png" width="128" alt="Pinscher app icon"></p>
+
 Pinscher is a macOS menu bar manager that lets you hide menu bar items you do not need to see all the time.
+
+## How it looks
+
+Pinscher hides the icons you don't need as soon as it starts. Only what you want to see stays in the menu bar:
+
+<img src="docs/images/menubar-hidden.png" alt="Menu bar with the extra icons hidden" width="650">
+
+Click the pinscher icon (or press ⌥⌘P) and everything comes back. The thin slash marks the edge of the hidden area; icons to its left are the ones Pinscher hides:
+
+<img src="docs/images/menubar-shown.png" alt="Menu bar with every icon shown" width="650">
+
+Settings let you record the shortcut, choose when to hide again, and turn on the always-hidden section:
+
+<img src="docs/images/settings-en.png" alt="Pinscher settings window" width="520">
 
 ## Status
 
@@ -10,9 +26,9 @@ Early development. Behavior and configuration may change between releases.
 
 ## Features
 
-- **Available:** Show or hide menu bar items with a click.
+- **Available:** Hide icons as soon as Pinscher starts, and show or hide them with a click.
 - **Available:** Move the separator with ⌘-drag to choose which items stay hidden to its left.
-- **Available:** Toggle visibility with ⌥⌘P and configure auto-hide and launch at login in Preferences.
+- **Available:** Toggle visibility with ⌥⌘P and configure auto-hide and launch at login in Settings.
 - **Available:** Optional always-hidden section with its own separator.
 - **Experimental:** A second bar (⌥-click), item organization in the Layout tab, and explicit restoration of saved sections. Real capture and drag validation requires granting system permissions.
 

@@ -2,7 +2,23 @@
 
 # Pinscher
 
+<p align="center"><img src="docs/images/icon.png" width="128" alt="Ícone do Pinscher"></p>
+
 Pinscher é um gerenciador da barra de menus do macOS que permite ocultar os itens que você não precisa ver o tempo todo.
+
+## Como fica
+
+O Pinscher oculta os ícones de que você não precisa assim que abre. Só o que você quer ver fica na barra de menus:
+
+<img src="docs/images/menubar-hidden.png" alt="Barra de menus com os ícones extras ocultos" width="650">
+
+Clique no ícone do pinscher (ou aperte ⌥⌘P) e tudo volta. A barrinha fina marca o limite da área oculta; os ícones à esquerda dela são os que o Pinscher esconde:
+
+<img src="docs/images/menubar-shown.png" alt="Barra de menus com todos os ícones visíveis" width="650">
+
+Nos Ajustes você grava o atalho, escolhe quando ocultar de novo e liga a seção sempre oculta:
+
+<img src="docs/images/settings-pt.png" alt="Janela de ajustes do Pinscher" width="520">
 
 ## Status
 
@@ -10,9 +26,9 @@ Em desenvolvimento inicial. O comportamento e a configuração podem mudar entre
 
 ## Recursos
 
-- **Disponível:** Mostrar ou ocultar itens da barra de menus com um clique.
+- **Disponível:** Ocultar os ícones assim que o Pinscher abre, e mostrá-los ou ocultá-los com um clique.
 - **Disponível:** Mover o separador com ⌘ e arrastar para escolher quais itens ficam ocultos à esquerda dele.
-- **Disponível:** Alternar a visibilidade com ⌥⌘P e configurar ocultação automática e início com o login nas Preferências.
+- **Disponível:** Alternar a visibilidade com ⌥⌘P e configurar ocultação automática e início com o login nos Ajustes.
 - **Disponível:** Seção sempre oculta opcional, com separador próprio.
 - **Experimental:** Segunda barra (⌥ + clique), organização na aba Layout e restauração explícita das seções salvas. A validação real da captura e do arraste exige liberar as permissões do sistema.
 
