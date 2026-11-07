@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-06
+
+First public release. Early development: the basics are solid, the advanced features are experimental.
+
 ### Added
 
 - macOS menu bar app skeleton.
@@ -27,3 +31,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Reject non-finite divider positions and renew auto-hide after revealing all icons.
 - Restore temporary reveals even when auto-hide is disabled.
 - Preserve existing preferences when a save would exceed the file size limit.
+
+[Unreleased]: https://github.com/djbrunoramon/pinscher/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/djbrunoramon/pinscher/releases/tag/v0.1.0
